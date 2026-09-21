@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intersecting Forms — perspective drawing reference</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<div id="stage"></div>
+
+<aside id="panel">
+	<header>
+		<h1>Intersecting Forms</h1>
+		<p>Perspective drawing reference</p>
+	</header>
+
+	<section>
+		<label class="field" for="shape">Shape</label>
+		<div class="row">
+			<select id="shape"></select>
+			<button id="add" class="primary">Add</button>
+		</div>
+		<p class="note">Each new form is placed so it cuts into one already in the scene.</p>
+	</section>
+
+	<section>
+		<div class="row wrap">
+			<button id="regenerate">New scene</button>
+			<button id="undo">Undo</button>
+			<button id="clear">Clear</button>
+			<button id="fit">Fit view</button>
+		</div>
+	</section>
+
+	<section>
+		<span class="field">Line style</span>
+		<div class="segmented" id="mode">
+			<button data-mode="xray">X-ray</button>
+			<button data-mode="hiddenLine" class="active">Hidden-line</button>
+		</div>
+		<p class="note" id="modeNote">Occluded lines are removed, so what is in front reads unambiguously.</p>
+	</section>
+
+	<section>
+		<span class="field">Shading</span>
+		<label class="slider"><span>Surface tone</span><output>47</output><input type="range" id="shading" min="0" max="100" value="47"></label>
+		<label class="slider"><span>Cast shadow</span><output>19</output><input type="range" id="shadow" min="0" max="100" value="19"></label>
+		<label class="slider"><span>Light around</span><output>135°</output><input type="range" id="azimuth" min="0" max="360" value="135"></label>
+		<label class="slider"><span>Light height</span><output>48°</output><input type="range" id="elevation" min="8" max="86" value="48"></label>
+		<p class="note">Tone gives the curves a surface to read against; the shadow restates depth without adding lines.</p>
+	</section>
+
+	<section>
+		<span class="field">Show</span>
+		<label class="check"><input type="checkbox" id="showIntersections" checked> Intersection curves</label>
+		<label class="check"><input type="checkbox" id="showConstruction"> Construction guides</label>
+		<label class="check"><input type="checkbox" id="showGrid" checked> Ground grid</label>
+		<label class="slider"><span>Curve weight</span><output>4.5</output><input type="range" id="curveWeight" min="1" max="9" step="0.5" value="4.5"></label>
+	</section>
+
+	<section>
+		<span class="field">Palette</span>
+		<div class="segmented" id="theme">
+			<button data-theme="paper" class="active">Paper</button>
+			<button data-theme="blueprint">Blueprint</button>
+		</div>
+	</section>
+
+	<footer>
+		<p id="status">—</p>
+		<p class="note">Drag to orbit · scroll to zoom · right-drag or two fingers to pan</p>
+		<p class="note keys"><b>A</b> add · <b>N</b> new scene · <b>Z</b> undo · <b>X</b> line style · <b>F</b> fit</p>
+	</footer>
+</aside>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
