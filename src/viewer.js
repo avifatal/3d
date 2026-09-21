@@ -81,7 +81,16 @@ export class Viewer {
 				color: this.theme.accentHidden, linewidth: 3, depthTest: false,
 				dashed: true, dashSize: 0.1, gapSize: 0.07,
 			} ),
-			construction: createLineMaterial( { color: this.theme.construction, linewidth: 1 } ),
+			// A guide often lies exactly on an edge of the form it was drawn
+			// from — the ghost of an uncut solid shares every edge the cutting
+			// left alone. Both would then be at the same depth, and which one
+			// wins is decided per frame, so the edge underneath comes out
+			// stippled. The guide is pushed back a hair so the form's own line
+			// always wins.
+			construction: createLineMaterial( {
+				color: this.theme.construction, linewidth: 1,
+				polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2,
+			} ),
 			constructionHidden: createLineMaterial( {
 				color: this.theme.construction, linewidth: 1, depthTest: false, opacity: 0.35, transparent: true,
 			} ),

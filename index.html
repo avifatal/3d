@@ -18,10 +18,11 @@
 
 	<section>
 		<span class="field">Exercise</span>
-		<div class="segmented" id="exercise">
+		<div class="segmented grid" id="exercise">
 			<button data-exercise="intersecting" class="active">Intersect</button>
 			<button data-exercise="stacking">Stack</button>
 			<button data-exercise="queue">Queue</button>
+			<button data-exercise="carving">Carve</button>
 		</div>
 	</section>
 
@@ -69,6 +70,18 @@
 		</div>
 		<div class="row wrap">
 			<button id="requeue" class="primary">New arrangement</button>
+		</div>
+	</section>
+
+	<section data-exercise-panel="carving" hidden>
+		<span class="field">Guides show</span>
+		<div class="segmented" id="carveGuides">
+			<button data-guides="solid" class="active">Solid</button>
+			<button data-guides="cuts">Solid + cuts</button>
+		</div>
+		<p class="note">What the form was carved from, drawn faint. Switch them on with <b>Construction guides</b> below.</p>
+		<div class="row wrap">
+			<button id="recarve" class="primary">New form</button>
 		</div>
 	</section>
 

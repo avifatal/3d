@@ -9,6 +9,7 @@ import { createShape, SHAPES } from './shapes.js';
 import { buildEdgeData, extractContour, maxContourSegments } from './silhouette.js';
 import { generateQueue, SHAPE_IDS as QUEUE_SHAPE_IDS, THIN_AXIS } from './queueing.js';
 import { generateStacking } from './stacking.js';
+import { generateSubtraction } from './subtraction.js';
 
 const label = shapeId => SHAPES.find( shape => shape.id === shapeId ).label;
 
@@ -104,6 +105,10 @@ function acrossAzimuth( items ) {
 
 }
 
+/** What the carving exercise's construction guides draw. */
+const ghostLines = ( ghost, guides ) =>
+	( guides === 'cuts' ? [ ...ghost.solid, ...ghost.cuts ] : ghost.solid );
+
 function transformPolyline( points, matrix ) {
 
 	const out = new Float32Array( points.length );
@@ -137,6 +142,8 @@ export class FormScene {
 		// Stacked boxes sit on a real floor, so the grid belongs at that
 		// exact height rather than floated below the lowest form.
 		this.groundLevel = null;
+		this.carveGhost = null;
+		this.carveForm = null;
 
 		viewer.onFrame( eye => this.updateContours( eye ) );
 
@@ -388,6 +395,62 @@ export class FormScene {
 		this.frame( { pitch: 0, azimuth: acrossAzimuth( items ) } );
 
 		return { forms: items.length, rows, columns, shapeId: chosen };
+
+	}
+
+	/**
+	 * Replace the scene with one procedurally generated solid, carved.
+	 *
+	 * The result is a single form with no intersections — the cuts are gone,
+	 * not overlapping — so what would be the curve pass is empty and the
+	 * drawing is carried entirely by hard edges and contours.
+	 *
+	 * @param {'solid'|'cuts'} guides  what the construction lines ghost
+	 * @returns {{ cuts: number, removed: number }}
+	 */
+	carve( guides ) {
+
+		this.clear();
+
+		const result = generateSubtraction( this.rng );
+		result.geometry.computeBoundingSphere();
+
+		this.carveGhost = result.ghost;
+		this.carveForm = this.createForm( {
+			geometry: result.geometry,
+			construction: ghostLines( result.ghost, guides ),
+			shapeId: 'carved',
+			label: 'Carved form',
+			radius: result.geometry.boundingSphere.radius,
+			pairs: [],
+		} );
+
+		this.groundLevel = null;
+		this.refreshGround();
+		this.frame();
+
+		return { cuts: result.cuts, removed: result.removed };
+
+	}
+
+	/**
+	 * Swap what the construction guides ghost without generating a new form —
+	 * the form on screen is the one being drawn, and changing what is shown
+	 * around it must not take it away.
+	 */
+	setCarveGuides( guides ) {
+
+		const form = this.carveForm;
+		if ( ! form || this.forms[ 0 ] !== form || ! this.carveGhost ) return;
+
+		form.constructionLines.dispose();
+		form.constructionLines = new CurveLines(
+			ghostLines( this.carveGhost, guides ),
+			this.viewer.materials.construction,
+			this.viewer.materials.constructionHidden,
+		).addTo( this.viewer.scene );
+		form.constructionLines.setVisible( this.showConstruction );
+		this.applyMode();
 
 	}
 

@@ -41,6 +41,7 @@ export function buildEdgeData( geometry, creaseAngle = 18 ) {
 
 	const corners = new Int32Array( triangleCount * 3 );
 	const faceNormals = new Float64Array( triangleCount * 3 );
+	const degenerate = new Uint8Array( triangleCount );
 
 	for ( let t = 0; t < triangleCount; t ++ ) {
 
@@ -58,11 +59,17 @@ export function buildEdgeData( geometry, creaseAngle = 18 ) {
 		const nx = aby * acz - abz * acy;
 		const ny = abz * acx - abx * acz;
 		const nz = abx * acy - aby * acx;
-		const length = Math.hypot( nx, ny, nz ) || 1;
+		const length = Math.hypot( nx, ny, nz );
 
-		faceNormals[ 3 * t ] = nx / length;
-		faceNormals[ 3 * t + 1 ] = ny / length;
-		faceNormals[ 3 * t + 2 ] = nz / length;
+		// A triangle with no area has no direction either. Normalising the
+		// noise gives it one anyway, at a wild angle to whatever it sits
+		// beside, so it is recorded as having none and left out of every
+		// crease it touches.
+		degenerate[ t ] = length < 1e-12 ? 1 : 0;
+
+		faceNormals[ 3 * t ] = nx / ( length || 1 );
+		faceNormals[ 3 * t + 1 ] = ny / ( length || 1 );
+		faceNormals[ 3 * t + 2 ] = nz / ( length || 1 );
 
 	}
 
@@ -102,23 +109,37 @@ export function buildEdgeData( geometry, creaseAngle = 18 ) {
 	const creaseCos = Math.cos( creaseAngle * Math.PI / 180 );
 	const hard = [];
 
+	// Every solid drawn here is closed, so an edge with one face is not a
+	// boundary — it is a boolean result whose two sides were triangulated
+	// differently, and drawing it puts a line straight across a flat face.
+	// An edge with three or more is the same story from coincident faces. So
+	// an edge is judged by the widest angle between the faces meeting along
+	// it, however many there are, and an unpaired one is left alone.
 	for ( const edge of edges.values() ) {
 
-		if ( edge.faces.length !== 2 ) {
+		const faces = edge.faces.filter( face => ! degenerate[ face ] );
+		if ( faces.length < 2 ) continue;
 
-			hard.push( edge );
-			continue;
+		let widest = 1;
+
+		for ( let i = 0; i < faces.length; i ++ ) {
+
+			for ( let j = i + 1; j < faces.length; j ++ ) {
+
+				const f0 = faces[ i ], f1 = faces[ j ];
+				const dot =
+					faceNormals[ 3 * f0 ] * faceNormals[ 3 * f1 ] +
+					faceNormals[ 3 * f0 + 1 ] * faceNormals[ 3 * f1 + 1 ] +
+					faceNormals[ 3 * f0 + 2 ] * faceNormals[ 3 * f1 + 2 ];
+
+				if ( dot < widest ) widest = dot;
+
+			}
 
 		}
 
-		const [ f0, f1 ] = edge.faces;
-		const dot =
-			faceNormals[ 3 * f0 ] * faceNormals[ 3 * f1 ] +
-			faceNormals[ 3 * f0 + 1 ] * faceNormals[ 3 * f1 + 1 ] +
-			faceNormals[ 3 * f0 + 2 ] * faceNormals[ 3 * f1 + 2 ];
-
-		if ( dot < creaseCos ) hard.push( edge );
-		else parent[ find( f0 ) ] = find( f1 );
+		if ( widest < creaseCos ) hard.push( edge );
+		else for ( let i = 1; i < faces.length; i ++ ) parent[ find( faces[ 0 ] ) ] = find( faces[ i ] );
 
 	}
 

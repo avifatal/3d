@@ -2,6 +2,7 @@ import { FormScene } from './app.js';
 import { ARRANGEMENTS, LEVELS as QUEUE_LEVELS, SHAPE_IDS as QUEUE_SHAPE_IDS } from './queueing.js';
 import { SHAPES } from './shapes.js';
 import { LEVELS } from './stacking.js';
+import { GUIDES } from './subtraction.js';
 import { Viewer } from './viewer.js';
 
 const INITIAL_FORMS = 3;
@@ -85,6 +86,18 @@ const EXERCISES = {
 
 		},
 	},
+	carving: {
+		title: 'Form Subtraction',
+		blurb: 'One solid, carved by others',
+		start: () => carve(),
+		summary: () => {
+
+			const { forms } = scene.stats();
+			if ( ! forms ) return 'no form';
+			return `${count( lastCarve.cuts, 'cut' )} · ${Math.round( lastCarve.removed * 100 )}% removed`;
+
+		},
+	},
 };
 
 let exercise = 'intersecting';
@@ -93,6 +106,8 @@ let queueLevel = QUEUE_LEVELS[ 0 ].id;
 let arrangement = ARRANGEMENTS[ 0 ].id;
 let lastStack = { boxes: 0, stacks: 0, leaners: 0 };
 let lastQueue = { forms: 0, rows: 0, columns: 0, shapeId: QUEUE_SHAPE_IDS[ 0 ] };
+let carveGuides = GUIDES[ 0 ].id;
+let lastCarve = { cuts: 0, removed: 0 };
 
 const PLURALS = { box: 'boxes' };
 const count = ( n, noun ) => `${n} ${n === 1 ? noun : PLURALS[ noun ] ?? `${noun}s` }`;
@@ -141,6 +156,12 @@ function stack() {
 function requeue() {
 
 	lastQueue = scene.queue( arrangement, queueLevel, queueShapeSelect.value );
+
+}
+
+function carve() {
+
+	lastCarve = scene.carve( carveGuides );
 
 }
 
@@ -327,6 +348,40 @@ $( 'requeue' ).addEventListener( 'click', () => withBusyState( () => {
 
 } ) );
 
+// --- form subtraction ------------------------------------------------------
+
+/**
+ * Changing what the guides show must not generate a new form: the one on
+ * screen is the one being drawn.
+ */
+function setCarveGuides( id ) {
+
+	carveGuides = id;
+
+	for ( const button of $( 'carveGuides' ).children ) {
+
+		button.classList.toggle( 'active', button.dataset.guides === id );
+
+	}
+
+	scene.setCarveGuides( id );
+
+}
+
+$( 'carveGuides' ).addEventListener( 'click', event => {
+
+	const button = event.target.closest( 'button[data-guides]' );
+	if ( button ) setCarveGuides( button.dataset.guides );
+
+} );
+
+$( 'recarve' ).addEventListener( 'click', () => withBusyState( () => {
+
+	carve();
+	report();
+
+} ) );
+
 // --- scene -----------------------------------------------------------------
 
 $( 'undo' ).addEventListener( 'click', () => {
@@ -460,6 +515,7 @@ selectMode( $( 'mode' ).querySelector( 'button.active' ) );
 level = $( 'level' ).querySelector( 'button.active' ).dataset.level;
 queueLevel = $( 'queueLevel' ).querySelector( 'button.active' ).dataset.level;
 arrangement = $( 'arrangement' ).querySelector( 'button.active' ).dataset.arrangement;
+carveGuides = $( 'carveGuides' ).querySelector( 'button.active' ).dataset.guides;
 levelNote.textContent = LEVELS.find( entry => entry.id === level ).note;
 describeQueue();
 

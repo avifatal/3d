@@ -1,6 +1,6 @@
 # Perspective Forms
 
-An interactive 3D reference for perspective drawing practice. Three exercises share one
+An interactive 3D reference for perspective drawing practice. Four exercises share one
 renderer and one set of drawing controls:
 
 * **Intersecting Forms** — add simple solids to a scene; each new one is placed so that
@@ -12,6 +12,9 @@ renderer and one set of drawing controls:
 * **Object Queue** — one form repeated along a path or over a sheet, at three
   difficulty levels, after the queueing half of the same workbook page. The forms float
   across eye level rather than resting on anything, and the path can bend.
+* **Form Subtraction** — a solid you have not seen before, carved by others. The solid
+  is generated from a random profile rather than picked from a list, and the material
+  taken out can be ghosted behind it.
 
 ```bash
 npm install
@@ -33,6 +36,7 @@ below it is shared and keeps its settings when you switch.
 | *Queue:* **Arrangement** | Queue ↔ Matrix (`Q`) |
 | *Queue:* **Level** | Easier · Harder · Hardest (`1` `2` `3`) |
 | *Queue:* **Form** | The form that gets repeated, or Random |
+| *Carve:* **Guides show** | Ghost the solid it was carved from, or that plus every cut |
 | **New scene** / **New arrangement** | `N` |
 | **Fit view** / **Undo** / **Clear** | `F` · `Z` · — |
 | **Line style** | X-ray ↔ hidden-line (`X`) |
@@ -167,6 +171,78 @@ form is rolled or mirrored; and every arrangement is centred. It carries a known
 case for the bug the solver exists to prevent — an arc spaced by centre distance, which
 must read as overlapping — so the check cannot quietly stop detecting it.
 
+### Form subtraction
+
+This exercise has no levels. It is one thing — a form you have never seen, with a cut
+or two driven through it — and it is generated fresh every time rather than picked from
+a list of shapes.
+
+The solid is built from a 2D profile drawn at random — straight runs and arcs, or a
+skyline of columns — and extruded to give it its third dimension. The profile's corners
+are drawn at *sorted* angles around its centre, which makes it star-shaped and therefore
+simple; an outline that crosses itself extrudes into a solid no boolean can make sense
+of, and rejecting those afterwards is more work than not drawing them.
+
+The cuts are the opposite. They stay a small vocabulary of recognisable tools — a slot
+and a wedge — because a cut has to read *as a cut*: a hole left by an arbitrary carved
+shape reads as damage, and there is nothing to learn from drawing it.
+
+Two rules govern every cut, and both are checked against the real boolean rather than
+assumed. **A cut must take a worthwhile bite and no more** — the volume actually removed
+is measured and the cut rejected on either side. **And the form stays in one piece** — a
+cut that saws the solid in two passes every volume check there is, since both halves are
+still present, so the result's connected components are counted.
+
+How deep a cut goes is measured too. A ray is fired from the entry point into the solid
+and the far wall it comes out of gives the thickness there, so the cut can be driven
+exactly through without knowing anything about the form's shape. Each cut also samples
+the surface *as it then is*, so a second cut is as likely to start from the wall the
+first one opened as from the original outside of the form.
+
+#### A boolean result is not a mesh yet
+
+This was the whole difficulty, and it is not visible in any volume or placement check.
+
+A CSG result is geometrically exact — the volume of a 2×2×2 cube with a 0.6×0.6 slot
+driven through it comes back as 7.28 to six decimal places — but it is **not manifold**.
+Each source triangle is clipped and re-triangulated on its own, so where a finely cut
+face meets an untouched one, the shared edge is a single long edge on one side and
+several short ones on the other. In that cube, 69 of 126 edges belonged to exactly one
+triangle.
+
+Nothing in the intersecting exercise ever noticed, because it reads material-group
+patches and never asks which triangles are adjacent. But every line in a carved form
+comes from edge adjacency, and `buildEdgeData` treated an edge with one face as a shell
+boundary and drew it — a line straight across every flat face — while the creases that
+should have been found were missed, because the two faces never met along an edge at
+all.
+
+So `geomutil.js` repairs the mesh first: any welded vertex lying on an edge is inserted
+into it, and the triangle — still convex, since the new points are on its own sides — is
+re-cut. Two details matter. The repair fans from a point *inside* the triangle rather
+than from one of its corners: a corner fan puts the split points of the two edges
+meeting at that corner in a straight line with it, and those pieces come out with no
+area at all, whose normals are pure noise that reads as a crease against every
+neighbour. And **every** edge is examined, not only the ones that failed to pair up,
+because an edge can be used twice and still have a vertex sitting on it.
+
+Edges are then classified by the widest angle between the faces meeting along them,
+however many there are, and an edge left with one face is ignored rather than drawn.
+Every solid drawn here is closed, so a one-faced edge is never a real boundary — it is
+the last of the numerical residue, and leaving it alone can only ever cost a crease,
+never invent a line. Faces with no area are left out of the creases they touch for the
+same reason.
+
+`test/subtraction.mjs` pins this down with the cube above, whose lines can be worked out
+by hand: twelve cube edges at 2 each, two 0.6 square rims where the slot comes out, and
+four edges running the slot's length — 36.8 exactly, which is what the renderer now
+draws. A line across a flat face would make that longer and a crease lost to a
+T-junction would make it shorter, where a segment *count* would say nothing, since the
+repair legitimately splits real edges into several pieces. The suite also asserts the
+raw boolean fails the manifold check before the repair passes it, that the repair does
+not move the surface by so much as a rounding error, and that sixteen generated forms
+are sixteen *different* forms.
+
 ### Horizon
 
 The horizon is not a line in the scene: it is the vanishing line of the ground plane,
@@ -240,6 +316,7 @@ src/shapes.js        the five forms and their construction guides
 src/placement.js     surface sampling and validated placement
 src/stacking.js      box stacking: contact solving and the three levels
 src/queueing.js      object queue & matrix: path frames and spacing solving
+src/subtraction.js   form subtraction: generated solids, tools and cut validation
 src/horizon.js       eye-level overlay
 src/lines.js         fat-line plumbing, visible/hidden pass pairs
 src/surface.js       surface shading material and light rig

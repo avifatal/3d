@@ -9,7 +9,7 @@
 // tessellation noise that naive edge extraction picks up.
 
 import { MeshBasicMaterial } from 'three';
-import { Brush, Evaluator, INTERSECTION, computeMeshVolume } from 'three-bvh-csg';
+import { Brush, Evaluator, INTERSECTION, SUBTRACTION, computeMeshVolume } from 'three-bvh-csg';
 import { chainSegments, edgeKey, triangleIndices, weldPositions } from './geomutil.js';
 
 const evaluator = new Evaluator();
@@ -23,6 +23,18 @@ evaluator.removeUnusedMaterials = false;
 const MATERIAL_A = new MeshBasicMaterial();
 const MATERIAL_B = new MeshBasicMaterial();
 
+/**
+ * A second evaluator, for carving. Its settings are deliberately the opposite
+ * of the one above, because it is doing the opposite kind of job: there the
+ * result is a scaffold read for its tagging and thrown away, here the result
+ * *is* the form that gets drawn. So groups are off — the carved solid is one
+ * mesh with one material — and normals are carried through the boolean, which
+ * is what keeps the wall of a bored cylinder smooth instead of faceted.
+ */
+const carver = new Evaluator();
+carver.attributes = [ 'position', 'normal' ];
+carver.useGroups = false;
+
 // Curve branches shorter than this fraction of the longest branch are CSG noise.
 const FRAGMENT_RATIO = 0.06;
 
@@ -32,6 +44,35 @@ export function makeBrush( geometry ) {
 	const brush = new Brush( geometry, MATERIAL_A );
 	brush.updateMatrixWorld( true );
 	return brush;
+
+}
+
+/**
+ * `solid` with `tool` carved out of it, as a world-baked geometry ready for
+ * `FormScene.createForm()`, or `null` if the boolean failed or removed
+ * everything. The caller decides whether the cut was worth keeping; this only
+ * reports what it produced.
+ */
+export function subtract( solid, tool ) {
+
+	let result;
+	try {
+
+		result = carver.evaluate( solid, tool, SUBTRACTION );
+
+	} catch ( error ) {
+
+		console.warn( 'CSG subtraction failed', error );
+		return null;
+
+	}
+
+	const geometry = result.geometry;
+	const position = geometry.getAttribute( 'position' );
+	if ( ! position || position.count < 3 ) return null;
+
+	geometry.clearGroups();
+	return geometry;
 
 }
 

@@ -146,6 +146,11 @@ button.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(
 	color: var(--panel);
 }
 
+/* Four exercises do not fit across the panel in one row. */
+.segmented.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.segmented.grid button { border-radius: 6px; border-left: 1px solid var(--panel-edge); }
+.segmented.grid button.active { border-color: var(--text); }
+
 .check {
 	display: flex;
 	align-items: center;
