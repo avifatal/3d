@@ -366,6 +366,12 @@ function setCarveGuides( id ) {
 
 	scene.setCarveGuides( id );
 
+	// Choosing what the guides show is a request to see them. The only thing
+	// that makes them visible is the shared checkbox three sections further
+	// down the panel, so with it off both choices redraw lines nobody can
+	// see and the control reads as dead. Switch it on and let it follow.
+	showConstructionGuides( true );
+
 }
 
 $( 'carveGuides' ).addEventListener( 'click', event => {
@@ -463,6 +469,14 @@ function bindCheck( id, apply ) {
 	const input = $( id );
 	input.addEventListener( 'change', () => apply( input.checked ) );
 	apply( input.checked );
+
+}
+
+/** The checkbox and the scene, kept in step whoever asked. */
+function showConstructionGuides( value ) {
+
+	$( 'showConstruction' ).checked = value;
+	scene.setConstructionVisible( value );
 
 }
 

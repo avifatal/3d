@@ -10,16 +10,16 @@ An interactive 3D perspective-drawing reference. Four exercises — **Intersecti
 
 ```bash
 npm run dev          # vite dev server; takes the lowest free port from 5173 up
-npm test             # all five geometry suites
+npm test             # all six geometry suites
 npm run build        # production bundle into dist/
 npm run preview      # serve the built bundle
 
-node test/stacking.mjs   # one suite on its own (also intersections.mjs, silhouette.mjs, queueing.mjs, subtraction.mjs)
+node test/stacking.mjs   # one suite on its own (also intersections.mjs, silhouette.mjs, placement.mjs, queueing.mjs, subtraction.mjs)
 ```
 
 Tests are plain node scripts — no runner, no WebGL, no browser. They import `src/*.js` directly, which means nothing under `src/` may touch a browser global at module scope or the suites stop running.
 
-**Only `test/stacking.mjs`, `test/queueing.mjs` and `test/subtraction.mjs` actually assert** — they print `PASS` / `*** FAIL ***` per group and set a non-zero exit code. `test/intersections.mjs` and `test/silhouette.mjs` are measurement harnesses: they print numbers you have to read, and exit 0 whatever those numbers say. So `npm test` exiting clean is **not** evidence the intersection or contour geometry is right. Read the output, and compare against the reference values printed alongside each measurement (`want ~0`, `exact contour circle`, `facet inset ~2e-3`, and so on).
+**Only `test/placement.mjs`, `test/stacking.mjs`, `test/queueing.mjs` and `test/subtraction.mjs` actually assert** — they print `PASS` / `*** FAIL ***` per group and set a non-zero exit code. `test/intersections.mjs` and `test/silhouette.mjs` are measurement harnesses: they print numbers you have to read, and exit 0 whatever those numbers say. So `npm test` exiting clean is **not** evidence the intersection or contour geometry is right. Read the output, and compare against the reference values printed alongside each measurement (`want ~0`, `exact contour circle`, `facet inset ~2e-3`, and so on).
 
 ### Visual verification
 
@@ -41,7 +41,7 @@ Frame times in these captures are SwiftShader rasterisation, not app cost — me
 
 `FormScene` (`src/app.js`) owns every solid in the scene regardless of exercise. All four exercises funnel through **`FormScene.createForm()`**, which builds the mesh, the static hard-edge lines, the dynamic contour buffer, the construction guides and the intersection curves for one solid. They differ only in two things: how the geometry gets positioned, and where the intersection pairs come from.
 
-* **Intersecting Forms** — `src/placement.js` samples a point on an existing surface, aims a new solid at it, and *verifies* the placement by computing the real intersection curve before committing. It returns the pairs it already computed, so `createForm` does no extra CSG.
+* **Intersecting Forms** — `src/placement.js` samples a point on an existing surface, aims a new solid at it, and *verifies* the placement by computing the real intersection curve before committing. It returns the pairs it already computed, so `createForm` does no extra CSG. **Deciding whether a candidate is worth committing and deciding what to draw are two different questions, and the returned pairs answer the second one**: every curve that exists is handed back, while only the overlaps inside the scoring band may *justify* the placement. Filtering the drawn list by that band is how forms came to be committed with a visible interpenetration and no line along it — nothing downstream can notice, because `createForm` draws the list it is given and the status line counts the same list. `test/placement.mjs` recomputes the committed scene from scratch to catch it.
 * **Box Stacking** — `src/stacking.js` returns `{ size, position, quaternion, kind, stack, level }` records; `FormScene.stack()` bakes each into geometry and asks `intersectAgainstScene()` for pairs. In practice there are none, because stacking boxes only ever touch.
 * **Object Queue** — `src/queueing.js` returns `{ size, position, quaternion, index, row, column }` records for **one** form repeated. `FormScene.queue()` builds that form once with `createShape()` and bakes a clone of it per record. Pairs are asked for and are always empty; that call is kept as a tripwire, so a generator regression shows up as curves on screen rather than as forms quietly overlapping.
 * **Form Subtraction** — `src/subtraction.js` generates a solid and carves it, returning one finished geometry plus the ghost lines for what was removed. It has no levels: one extruded base, one or two slot-or-wedge cuts driven straight through. It is the only exercise whose geometry comes out of a boolean rather than out of `createShape()`, which is why the mesh has to be repaired first (below).
@@ -137,6 +137,8 @@ The generator's own two rules — a cut takes a worthwhile bite and no more, and
 
 `src/main.js`. **The markup is the single source of truth for initial state.** Which line style, palette, level, queue arrangement and carve guides start active, and every slider's initial value, are read out of `index.html` at startup — `selectMode()`, `bindSlider()`, `bindCheck()` and the block at the foot of the file all take their value from the button already carrying `.active`. Changing a default is a one-line edit in the markup. Do not also hardcode it in a module; that pair drifted once already and lit a button whose mode the renderer was not in.
 
+**A control that only changes something hidden reads as broken.** The carve panel's *Guides show* picks what the construction guides ghost, but nothing is on screen until the shared **Construction guides** checkbox — three sections further down — is ticked, and it starts off. Both choices redrew lines nobody could see. Picking either now switches that checkbox on through `showConstructionGuides()`, which keeps the input and `scene.setConstructionVisible()` in step; unticking it still hides them.
+
 Generators take an `rng` parameter (`Math.random` by default) so tests can seed them.
 
 ## Non-obvious constraints
@@ -160,4 +162,4 @@ These all cost real debugging time; changing them will reintroduce the bug named
 
 This has happened more than once, and the pattern is worth recognising: the assertion measured something adjacent to the property that mattered. The stacking support check originally asked whether the centre of mass sat inside the support's top-face *rectangle* — the area a box *could* be held over, not the area it *rests* on — so boxes balanced on a single edge passed it for weeks.
 
-When fixing a geometry bug, add a known-answer case that fails before the fix. `test/stacking.mjs` carries two (a tipped box must read `unsupported`, a square one `flat`), `test/queueing.mjs` carries an arc spaced by centre distance that must read as overlapping, `test/subtraction.mjs` carries a cube-with-a-slot whose lines add up to 36.8 by hand and asserts the raw boolean fails the manifold check before the repair passes it, and `test/intersections.mjs` asserts seam points lie on both parent surfaces. A suite that cannot demonstrate it detects the bug is not evidence the bug is gone.
+When fixing a geometry bug, add a known-answer case that fails before the fix. `test/stacking.mjs` carries two (a tipped box must read `unsupported`, a square one `flat`), `test/queueing.mjs` carries an arc spaced by centre distance that must read as overlapping, `test/subtraction.mjs` carries a cube-with-a-slot whose lines add up to 36.8 by hand and asserts the raw boolean fails the manifold check before the repair passes it, and `test/intersections.mjs` asserts seam points lie on both parent surfaces. `test/placement.mjs` goes one step further and refuses to pass *vacuously*: if a sweep never committed an overlap outside the scoring band it could not have caught the bug it exists for, so it fails instead of reporting a clean zero. A suite that cannot demonstrate it detects the bug is not evidence the bug is gone.

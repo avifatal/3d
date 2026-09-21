@@ -203,6 +203,7 @@ export function findPlacement( shape, forms, rng ) {
 		let score = 0;
 		let contained = false;
 		let curveLength = 0;
+		let scoring = 0;
 
 		for ( const form of touching ) {
 
@@ -212,15 +213,24 @@ export function findPlacement( shape, forms, rng ) {
 			const ratio = result.volume / Math.min( volume, form.volume );
 			if ( ratio > CONTAINMENT ) { contained = true; break; }
 			if ( result.polylines.length === 0 ) continue;
+
+			// Every curve that exists is drawn. Whether an overlap makes a
+			// good exercise is a separate question from whether the solids
+			// meet: a graze or a deep bite is still a real seam, and leaving
+			// it out draws two forms interpenetrating with nothing to show
+			// for it. Only the overlaps in the useful band below are allowed
+			// to *justify* the placement.
+			pairs.push( { form, polylines: result.polylines, ratio, length: result.length } );
+
 			if ( ratio < MIN_OVERLAP || ratio > MAX_OVERLAP ) continue;
 
-			pairs.push( { form, polylines: result.polylines, ratio, length: result.length } );
+			scoring ++;
 			curveLength += result.length;
 			score += result.length * overlapQuality( ratio );
 
 		}
 
-		if ( contained || pairs.length === 0 || curveLength < MIN_CURVE_LENGTH ) {
+		if ( contained || scoring === 0 || curveLength < MIN_CURVE_LENGTH ) {
 
 			geometry.dispose();
 			continue;
@@ -228,7 +238,7 @@ export function findPlacement( shape, forms, rng ) {
 		}
 
 		// Touching two forms at once makes for a far better drawing problem.
-		if ( pairs.length > 1 ) score *= 1.35;
+		if ( scoring > 1 ) score *= 1.35;
 
 		const candidate = {
 			matrix: matrix.clone(),

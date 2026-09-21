@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node test/intersections.mjs && node test/silhouette.mjs && node test/stacking.mjs && node test/queueing.mjs && node test/subtraction.mjs"
+    "test": "node test/intersections.mjs && node test/silhouette.mjs && node test/placement.mjs && node test/stacking.mjs && node test/queueing.mjs && node test/subtraction.mjs"
   },
   "keywords": [],
   "author": "",
