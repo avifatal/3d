@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Intersecting Forms — perspective drawing reference</title>
+<title>Perspective Forms — drawing reference</title>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -12,25 +12,72 @@
 
 <aside id="panel">
 	<header>
-		<h1>Intersecting Forms</h1>
-		<p>Perspective drawing reference</p>
+		<h1 id="exerciseTitle">Intersecting Forms</h1>
+		<p id="exerciseBlurb">Perspective drawing reference</p>
 	</header>
 
 	<section>
+		<span class="field">Exercise</span>
+		<div class="segmented" id="exercise">
+			<button data-exercise="intersecting" class="active">Intersect</button>
+			<button data-exercise="stacking">Stack</button>
+			<button data-exercise="queue">Queue</button>
+		</div>
+	</section>
+
+	<section data-exercise-panel="intersecting">
 		<label class="field" for="shape">Shape</label>
 		<div class="row">
 			<select id="shape"></select>
 			<button id="add" class="primary">Add</button>
 		</div>
 		<p class="note">Each new form is placed so it cuts into one already in the scene.</p>
+		<div class="row wrap">
+			<button id="regenerate">New scene</button>
+		</div>
+	</section>
+
+	<section data-exercise-panel="stacking" hidden>
+		<span class="field">Level</span>
+		<div class="segmented" id="level">
+			<button data-level="easier" class="active">Easier</button>
+			<button data-level="harder">Harder</button>
+			<button data-level="hardest">Hardest</button>
+		</div>
+		<p class="note" id="levelNote"></p>
+		<div class="row wrap">
+			<button id="restack" class="primary">New arrangement</button>
+		</div>
+	</section>
+
+	<section data-exercise-panel="queue" hidden>
+		<span class="field">Arrangement</span>
+		<div class="segmented" id="arrangement">
+			<button data-arrangement="queue" class="active">Queue</button>
+			<button data-arrangement="matrix">Matrix</button>
+		</div>
+		<span class="field">Level</span>
+		<div class="segmented" id="queueLevel">
+			<button data-level="easier" class="active">Easier</button>
+			<button data-level="harder">Harder</button>
+			<button data-level="hardest">Hardest</button>
+		</div>
+		<p class="note" id="queueLevelNote"></p>
+		<label class="field" for="queueShape">Form</label>
+		<div class="row">
+			<select id="queueShape"></select>
+		</div>
+		<div class="row wrap">
+			<button id="requeue" class="primary">New arrangement</button>
+		</div>
 	</section>
 
 	<section>
+		<span class="field">Scene</span>
 		<div class="row wrap">
-			<button id="regenerate">New scene</button>
+			<button id="fit">Fit view</button>
 			<button id="undo">Undo</button>
 			<button id="clear">Clear</button>
-			<button id="fit">Fit view</button>
 		</div>
 	</section>
 
@@ -57,6 +104,7 @@
 		<label class="check"><input type="checkbox" id="showIntersections" checked> Intersection curves</label>
 		<label class="check"><input type="checkbox" id="showConstruction"> Construction guides</label>
 		<label class="check"><input type="checkbox" id="showGrid" checked> Ground grid</label>
+		<label class="check"><input type="checkbox" id="showHorizon" checked> Horizon line</label>
 		<label class="slider"><span>Curve weight</span><output>4.5</output><input type="range" id="curveWeight" min="1" max="9" step="0.5" value="4.5"></label>
 	</section>
 
@@ -71,7 +119,7 @@
 	<footer>
 		<p id="status">—</p>
 		<p class="note">Drag to orbit · scroll to zoom · right-drag or two fingers to pan</p>
-		<p class="note keys"><b>A</b> add · <b>N</b> new scene · <b>Z</b> undo · <b>X</b> line style · <b>F</b> fit</p>
+		<p class="note keys"><b>E</b> exercise · <b>N</b> new scene · <b>Q</b> queue/matrix · <b>Z</b> undo · <b>X</b> line style · <b>F</b> fit</p>
 	</footer>
 </aside>
 

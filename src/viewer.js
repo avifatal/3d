@@ -7,6 +7,7 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createLineMaterial, RENDER_ORDER, setLineResolution } from './lines.js';
+import { HorizonLine } from './horizon.js';
 import { createSurfaceMaterial, lightDirection } from './surface.js';
 import { THEMES } from './theme.js';
 
@@ -35,7 +36,13 @@ export class Viewer {
 		// A tight near plane is what buys the depth precision that keeps curves
 		// lying on a surface from stippling; the orbit minimum keeps 0.25 safe.
 		this.camera = new PerspectiveCamera( 42, 1, 0.25, 250 );
-		this.camera.position.set( 6.4, 4.2, 8.2 );
+		// Kept low enough that eye level stays inside the frame: pitch down by
+		// more than half the field of view and the horizon slides off the top.
+		this.camera.position.set( 6.4, 2.9, 8.2 );
+
+		// The pitch that position sits at, kept so an exercise that levels the
+		// eye to study it can hand the default back when it is left.
+		this.defaultPitch = Math.atan2( this.camera.position.y, Math.hypot( this.camera.position.x, this.camera.position.z ) );
 
 		this.controls = new OrbitControls( this.camera, this.renderer.domElement );
 		this.controls.enableDamping = true;
@@ -80,6 +87,8 @@ export class Viewer {
 			} ),
 		};
 
+		this.horizon = new HorizonLine( container );
+
 		this.grid = null;
 		this.gridY = 0;
 		this.centre = new Vector3();
@@ -120,20 +129,24 @@ export class Viewer {
 
 	}
 
-	/** Ground height, light rig and shadow camera all follow the scene extent. */
-	setSceneBounds( box ) {
+	/**
+	 * Ground height, light rig and shadow camera all follow the scene extent.
+	 * `groundY` pins the floor for exercises that have a real one; without it
+	 * the grid floats just below the lowest form.
+	 */
+	setSceneBounds( box, groundY = null ) {
 
 		if ( box.isEmpty() ) {
 
 			this.centre.set( 0, 0, 0 );
 			this.radius = 4;
-			this.gridY = 0;
+			this.gridY = groundY ?? 0;
 
 		} else {
 
 			box.getCenter( this.centre );
 			this.radius = Math.max( box.getSize( new Vector3() ).length() / 2, 1 );
-			this.gridY = box.min.y - 0.7;
+			this.gridY = groundY ?? box.min.y - 0.7;
 
 		}
 
@@ -219,6 +232,7 @@ export class Viewer {
 		const theme = this.theme;
 		this.renderer.setClearColor( theme.background );
 		this.scene.background = new Color( theme.background );
+		this.container.style.setProperty( '--horizon-ink', `#${theme.construction.getHexString()}` );
 
 		this.surfaceMaterial.uniforms.uLit.value.copy( theme.background );
 		this.surfaceMaterial.uniforms.uShade.value.copy( theme.shade );
@@ -244,6 +258,12 @@ export class Viewer {
 	setGridVisible( value ) {
 
 		this.grid.visible = value;
+
+	}
+
+	setHorizonVisible( value ) {
+
+		this.horizon.setVisible( value );
 
 	}
 
@@ -273,6 +293,7 @@ export class Viewer {
 		setLineResolution( size.x, size.y );
 
 		this.lastEye.set( Infinity, 0, 0 );
+		this.horizon.lastY = null;
 
 	}
 
@@ -289,11 +310,20 @@ export class Viewer {
 
 		}
 
+		this.horizon.update( this.camera, this.container.clientHeight );
 		this.renderer.render( this.scene, this.camera );
 
 	}
 
-	frameScene( box ) {
+	/**
+	 * @param {Box3} box
+	 * @param {{ pitch?: number, azimuth?: number }|null} view  the angle to
+	 *   view from. Whatever it leaves out is taken from where the camera
+	 *   already is, so passing nothing keeps the angle the user orbited to. A
+	 *   pitch of zero puts eye level exactly through the centre of the scene,
+	 *   which is what an exercise about distance from the eye line needs.
+	 */
+	frameScene( box, view = null ) {
 
 		if ( box.isEmpty() ) return;
 
@@ -302,8 +332,20 @@ export class Viewer {
 		const distance = radius / Math.sin( ( this.camera.fov * Math.PI / 180 ) / 2 ) * 1.05;
 
 		const direction = new Vector3().subVectors( this.camera.position, this.controls.target );
-		if ( direction.lengthSq() < 1e-6 ) direction.set( 0.62, 0.42, 0.8 );
+		if ( direction.lengthSq() < 1e-6 ) direction.set( 0.62, 0.29, 0.8 );
 		direction.normalize();
+
+		if ( view ) {
+
+			const pitch = view.pitch ?? Math.asin( Math.min( Math.max( direction.y, - 1 ), 1 ) );
+			const azimuth = view.azimuth ?? Math.atan2( direction.z, direction.x );
+			direction.set(
+				Math.cos( pitch ) * Math.cos( azimuth ),
+				Math.sin( pitch ),
+				Math.cos( pitch ) * Math.sin( azimuth ),
+			);
+
+		}
 
 		this.controls.target.copy( centre );
 		this.camera.position.copy( centre ).addScaledVector( direction, distance );

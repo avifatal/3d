@@ -36,6 +36,30 @@ html, body {
 #stage { position: fixed; inset: 0; }
 #stage canvas { display: block; }
 
+/* Eye level. Drawn over the scene, like a construction line on tracing paper. */
+.horizon {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 0;
+	border-top: 1px solid var(--horizon-ink, #b6b0a2);
+	opacity: 0.85;
+	pointer-events: none;
+	will-change: transform;
+}
+
+.horizon span {
+	position: absolute;
+	right: 10px;
+	top: 3px;
+	font-size: 9.5px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--horizon-ink, #b6b0a2);
+	opacity: 0.8;
+}
+
 #panel {
 	position: fixed;
 	top: 16px;
@@ -69,6 +93,9 @@ section {
 	padding-top: 12px;
 	border-top: 1px solid var(--panel-edge);
 }
+
+/* A second labelled control in the same section needs room above it. */
+section > .field:not(:first-child) { margin-top: 12px; }
 
 .field {
 	display: block;
@@ -110,7 +137,7 @@ button.primary {
 button.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
 
 .segmented { display: flex; }
-.segmented button { flex: 1; border-radius: 0; }
+.segmented button { flex: 1; border-radius: 0; padding-inline: 6px; white-space: nowrap; }
 .segmented button:first-child { border-radius: 6px 0 0 6px; }
 .segmented button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
 .segmented button.active {
