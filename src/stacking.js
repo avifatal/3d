@@ -9,7 +9,7 @@
 // Working in the support's own frame is what makes the levels fall out
 // naturally. A yaw of zero means "parallel to the box below", so the easier
 // level keeps a whole tower square simply by not turning anything, while the
-// harder levels turn each box freely against the one beneath it.
+// harder levels give each box a modest turn against the one beneath it.
 //
 // A box is only ever one of two things, and nothing here may produce a third:
 // it sits flat on what is below it, or it leans against a neighbour. Tilting
@@ -34,7 +34,7 @@ export const LEVELS = [
 	{
 		id: 'harder',
 		label: 'Harder',
-		note: 'One tower, each box turned freely against the one below, sometimes with a box propped against it.',
+		note: 'Varied boxes turned and offset, with overhanging edges and balanced support.',
 	},
 	{
 		id: 'hardest',
@@ -56,11 +56,13 @@ const CONFIG = {
 	harder: {
 		perTower: [ 4, 6 ],
 		parallel: false,
-		leaners: [ 0, 1 ],
-		offset: 0.55,
-		footprint: [ 1.0, 2.2 ],
-		height: [ 0.4, 1.25 ],
-		shrink: [ 0.66, 0.96 ],
+		leaners: [ 0, 0 ],
+		offset: 0.25,
+		footprint: [ 1.6, 3.0 ],
+		height: [ 0.4, 0.85 ],
+		heightRatio: [ 0.16, 0.75 ],
+		overhang: true,
+		shrink: [ 0.65, 1.05 ],
 	},
 	hardest: {
 		total: [ 10, 16 ],
@@ -245,6 +247,13 @@ function restOnPlane( plane, size, yaw, offsetU, offsetV ) {
 	return { size: size.clone(), position, quaternion };
 }
 
+// A centre inside every lower footprint keeps the combined upper load
+// inside every contact patch, even when the corners overhang.
+function overFootprint( point, box ) {
+	const local = point.clone().sub( box.position ).applyQuaternion( box.quaternion.clone().invert() );
+	return Math.abs( local.x ) < box.size.x * 0.4 && Math.abs( local.z ) < box.size.z * 0.4;
+}
+
 function buildTower( rng, cfg, plane, count, boxes, stackId ) {
 	// Keeping the whole tower square is just "never turn anything": a yaw of
 	// zero is measured against the box below, not against the world.
@@ -254,6 +263,7 @@ function buildTower( rng, cfg, plane, count, boxes, stackId ) {
 	let footprintZ = footprintX * range( rng, 0.55, 1.5 );
 	let current = plane;
 	let support = null;
+	const tower = [];
 
 	for ( let i = 0; i < count; i ++ ) {
 		if ( i > 0 ) {
@@ -265,20 +275,46 @@ function buildTower( rng, cfg, plane, count, boxes, stackId ) {
 
 		const size = new Vector3( footprintX, range( rng, cfg.height[ 0 ], cfg.height[ 1 ] ), footprintZ );
 
-		const yaw = i === 0 ? baseYaw : ( cfg.parallel ? 0 : range( rng, - Math.PI, Math.PI ) );
+		const yaw = i === 0 ? baseYaw : ( cfg.parallel ? 0 : range( rng, - ( cfg.overhang ? 40 : 20 ), cfg.overhang ? 40 : 20 ) * DEG );
 
-		// Offsets stay well inside the support so the centre of mass never
-		// leaves it, even when the box itself overhangs.
-		const reach = cfg.offset * 0.7;
-		const offsetU = i === 0 ? 0 : range( rng, - 1, 1 ) * current.halfU * reach;
-		const offsetV = i === 0 ? 0 : range( rng, - 1, 1 ) * current.halfV * reach;
+		// Fit the rotated base inside the actual support face. Nested bases
+		// also keep the combined weight of all upper boxes over each support.
+		const cosine = Math.abs( Math.cos( yaw ) );
+		const sine = Math.abs( Math.sin( yaw ) );
+		let offsetU = 0, offsetV = 0;
+		if ( i > 0 && cfg.overhang ) {
+			offsetU = range( rng, - 1, 1 ) * current.halfU * cfg.offset;
+			offsetV = range( rng, - 1, 1 ) * current.halfV * cfg.offset;
+		} else if ( i > 0 ) {
+			const reachU = ( cosine * size.x + sine * size.z ) / 2;
+			const reachV = ( sine * size.x + cosine * size.z ) / 2;
+			const fit = Math.min( 1, current.halfU * 0.98 / reachU, current.halfV * 0.98 / reachV );
+			size.x *= fit;
+			size.z *= fit;
+			offsetU = range( rng, - 1, 1 ) * Math.min( current.halfU * cfg.offset, current.halfU - reachU * fit );
+			offsetV = range( rng, - 1, 1 ) * Math.min( current.halfV * cfg.offset, current.halfV - reachV * fit );
+		}
+
+		// Sample height after fitting the base: clamping an absolute height
+		// made most upper boxes land on exactly the same proportions.
+		const shortSide = Math.min( size.x, size.z );
+		size.y = cfg.heightRatio
+			? shortSide * range( rng, ...cfg.heightRatio )
+			: Math.min( size.y, shortSide * 0.75 );
 
 		const box = restOnPlane( current, size, yaw, offsetU, offsetV );
+		if ( cfg.overhang && ( ! overFootprint( plane.point, box ) ||
+			! tower.every( lower => overFootprint( box.position, lower ) ) ) ) {
+			// The tower origin stays inside every box, giving a stable fallback.
+			box.position.x = plane.point.x;
+			box.position.z = plane.point.z;
+		}
 		seatOnSupport( box, support, current.normal );
 		box.kind = 'stacked';
 		box.stack = stackId;
 		box.level = i;
 		boxes.push( box );
+		tower.push( box );
 
 		support = box;
 		current = topPlane( box );

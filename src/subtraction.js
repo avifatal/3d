@@ -1,280 +1,74 @@
-// Form subtraction: one solid, carved by others.
-//
-// The exercise is to draw a form you have never seen before, which means the
-// form has to be new every time. So nothing here picks from a list of five
-// shapes: the solid being carved is built from a 2D profile drawn at random —
-// straight runs and arcs, or a skyline of columns — and extruded to give it
-// its third dimension.
-//
-// The cuts are the opposite: they stay a small vocabulary of recognisable
-// tools — a slot and a wedge — because a cut has to read *as a cut*. A hole
-// left by an arbitrary carved shape reads as damage, and there is nothing to
-// learn from drawing it.
-//
-// Two rules govern every cut, and both are checked against the real boolean
-// rather than assumed:
-//
-//   1. **A cut must take a worthwhile bite and no more.** Too little and
-//      there is nothing to draw; too much and the form is gone. The volume
-//      actually removed is measured and the cut is rejected on either side.
-//
-//   2. **The form stays in one piece.** A cut that saws the solid in two
-//      leaves two forms, not a carved one, so the result's connected
-//      components are counted and the cut is rejected if it split anything.
-//
-// How deep a cut goes is measured, not guessed: a ray is fired from the entry
-// point into the solid and the far wall it comes out of gives the thickness
-// there, so a cut can be driven exactly through without knowing anything
-// about the form's shape.
+// Procedural subtraction: independently sampled dimensions, corner radii,
+// cutters and placements. Difficulty constrains complexity, never a template.
 
 import {
-	BoxGeometry, BufferAttribute, BufferGeometry, ExtrudeGeometry, Matrix4,
-	Quaternion, Shape, Vector2, Vector3,
+	BoxGeometry, BufferAttribute, BufferGeometry, CylinderGeometry,
+	ExtrudeGeometry, Matrix4, Shape, Vector3,
 } from 'three';
 import { chainSegments, repairTJunctions, triangleIndices, weldPositions } from './geomutil.js';
 import { makeBrush, meshVolume, subtract } from './intersections.js';
-import { buildSurfaceSampler } from './placement.js';
 import { buildEdgeData } from './silhouette.js';
 
-/** What the construction guides show. The shared toggle still turns them off. */
 export const GUIDES = [
 	{ id: 'solid', label: 'Solid' },
 	{ id: 'cuts', label: 'Solid + cuts' },
 ];
 
-/**
- * One setting, not three. The exercise is a form you have not seen before and
- * a couple of cuts through it; levels of it were tried and taken back out.
- */
-const CONFIG = {
-	cuts: [ 1, 2 ],
-	tools: [ 'slot', 'wedge' ],
-	tilt: 10,
-	bite: [ 0.07, 0.36 ],
-	budget: 0.5,
-};
-
-// The carved form is sized to sit in the same space as the other exercises'.
+export const LEVELS = [
+	{ id: 'easier', label: 'Easier', note: 'One generous cut with randomized placement and corner rounding.', cuts: [ 1, 1 ], pocketChance: 0, sideChance: 0 },
+	{ id: 'harder', label: 'Harder', note: 'Two or three cuts with varied shapes, openings and depths.', cuts: [ 2, 3 ], pocketChance: 0.3, sideChance: 0.25 },
+	{ id: 'hardest', label: 'Hardest', note: 'Three to five cuts that can meet across different faces.', cuts: [ 3, 5 ], pocketChance: 0.45, sideChance: 0.55 },
+];
+const range = ( rng, min, max ) => min + rng() * ( max - min );
 const TARGET_RADIUS = 1.7;
 
-const DEG = Math.PI / 180;
-const ATTEMPTS_PER_CUT = 14;
-
-const range = ( rng, min, max ) => min + rng() * ( max - min );
-const randInt = ( rng, min, max ) => min + Math.floor( rng() * ( max - min + 1 ) );
-const pick = ( rng, list ) => list[ Math.floor( rng() * list.length ) ];
-
-// --- profiles ---------------------------------------------------------------
-
-/**
- * A closed outline of straight runs and arcs. The corners are drawn at sorted
- * angles around the centre, which makes the outline star-shaped and therefore
- * simple — a profile that crosses itself extrudes into a solid no boolean can
- * make sense of, and rejecting those after the fact is far more work than not
- * drawing them.
- */
-function roundedProfile( rng ) {
-
-	const corners = randInt( rng, 3, 6 );
-	const shape = new Shape();
-	const points = [];
-
-	for ( let i = 0; i < corners; i ++ ) {
-
-		const angle = ( i + range( rng, - 0.18, 0.18 ) ) / corners * Math.PI * 2;
-		const radius = range( rng, 0.55, 1 );
-		points.push( new Vector2( Math.cos( angle ) * radius, Math.sin( angle ) * radius ) );
-
-	}
-
-	shape.moveTo( points[ 0 ].x, points[ 0 ].y );
-
-	for ( let i = 0; i < corners; i ++ ) {
-
-		const from = points[ i ];
-		const to = points[ ( i + 1 ) % corners ];
-
-		if ( rng() < 0.45 ) {
-
-			// A bulged side. The control point is the chord's midpoint pushed
-			// out or pulled in; kept close to 1 so the curve cannot swing back
-			// across a neighbouring side.
-			const bulge = range( rng, 0.86, 1.34 );
-			shape.quadraticCurveTo(
-				( from.x + to.x ) / 2 * bulge, ( from.y + to.y ) / 2 * bulge,
-				to.x, to.y,
-			);
-
-		} else {
-
-			shape.lineTo( to.x, to.y );
-
-		}
-
-	}
-
-	shape.closePath();
-	return shape;
-
+/** Independently rounded profile corners, extruded without beveling the faces. */
+function cornerBox( width, height, depth, radii ) {
+	const [ bl, br, tr, tl ] = radii;
+	const x = width / 2, y = height / 2;
+	const profile = new Shape();
+	profile.moveTo( - x + bl, - y );
+	profile.lineTo( x - br, - y );
+	if ( br ) profile.absarc( x - br, - y + br, br, - Math.PI / 2, 0, false );
+	profile.lineTo( x, y - tr );
+	if ( tr ) profile.absarc( x - tr, y - tr, tr, 0, Math.PI / 2, false );
+	profile.lineTo( - x + tl, y );
+	if ( tl ) profile.absarc( - x + tl, y - tl, tl, Math.PI / 2, Math.PI, false );
+	profile.lineTo( - x, - y + bl );
+	if ( bl ) profile.absarc( - x + bl, - y + bl, bl, Math.PI, Math.PI * 1.5, false );
+	profile.closePath();
+	return new ExtrudeGeometry( profile, { depth, bevelEnabled: false, curveSegments: 20 } )
+		.translate( 0, 0, - depth / 2 );
 }
 
-/**
- * A skyline: a flat base, a run of columns of differing heights, and back down
- * the other side. Always simple by construction, and it is where the L-shapes
- * and stepped blocks in the reference sheets come from.
- */
-function skylineProfile( rng ) {
-
-	const columns = randInt( rng, 2, 4 );
-	const widths = [];
-	const heights = [];
-	let width = 0;
-
-	for ( let i = 0; i < columns; i ++ ) {
-
-		widths.push( range( rng, 0.45, 1.1 ) );
-		heights.push( range( rng, 0.5, 1.6 ) );
-		width += widths[ i ];
-
-	}
-
-	const shape = new Shape();
-	shape.moveTo( - width / 2, 0 );
-
-	let x = - width / 2;
-	for ( let i = 0; i < columns; i ++ ) {
-
-		shape.lineTo( x, heights[ i ] );
-		x += widths[ i ];
-		shape.lineTo( x, heights[ i ] );
-
-	}
-
-	shape.lineTo( x, 0 );
-	shape.closePath();
-	return shape;
-
+function randomCorners( width, height, rng ) {
+	return Array.from( { length: 4 }, () => rng() < 0.45 ? 0 : Math.min( width, height ) * range( rng, 0.06, 0.2 ) );
 }
 
-// --- base solids ------------------------------------------------------------
-
-function extrudedBase( rng ) {
-
-	const shape = rng() < 0.5 ? roundedProfile( rng ) : skylineProfile( rng );
-	const depth = range( rng, 0.8, 2.2 );
-	const geometry = new ExtrudeGeometry( shape, { depth, bevelEnabled: false, curveSegments: 20 } );
-	geometry.translate( 0, 0, - depth / 2 );
-	return geometry;
-
+/** Sample one cutting volume, with no prearranged positions or combinations. */
+function randomTool( size, level, rng, first ) {
+	const axis = ! first && rng() < level.sideChance ? ( rng() < 0.5 ? 0 : 1 ) : 2;
+	const u = axis === 0 ? 2 : 0;
+	const v = axis === 1 ? 2 : 1;
+	const w = size[ u ] * range( rng, 0.24, 0.64 );
+	const h = size[ v ] * range( rng, 0.24, 0.64 );
+	const x = size[ u ] * range( rng, - 0.52, 0.52 );
+	const y = size[ v ] * range( rng, - 0.52, 0.52 );
+	const pocket = rng() < level.pocketChance;
+	const penetration = pocket ? size[ axis ] * range( rng, 0.25, 0.7 ) : size[ axis ];
+	const pad = size[ axis ] * 0.12;
+	const length = pocket ? penetration + pad : size[ axis ] + pad * 2;
+	const z = pocket ? size[ axis ] / 2 - penetration / 2 + pad / 2 : 0;
+	const curved = rng() < 0.45;
+	const geometry = curved
+		? new CylinderGeometry( 1, 1, length, 48 ).rotateX( Math.PI / 2 ).scale( w / 2, h / 2, 1 )
+		: new BoxGeometry( w, h, length );
+	geometry.translate( x, y, z );
+	if ( axis === 0 ) geometry.rotateY( Math.PI / 2 );
+	if ( axis === 1 ) geometry.rotateX( - Math.PI / 2 );
+	return { geometry, axis, curved, pocket, width: w, height: h, x, y, penetration };
 }
 
-/** Centre a geometry on its bounds and scale it to a comparable size. */
-function normalise( geometry ) {
-
-	geometry.computeBoundingBox();
-	const centre = geometry.boundingBox.getCenter( new Vector3() );
-	geometry.translate( - centre.x, - centre.y, - centre.z );
-
-	geometry.computeBoundingSphere();
-	const radius = geometry.boundingSphere.radius;
-	if ( radius > 1e-6 ) geometry.scale( TARGET_RADIUS / radius, TARGET_RADIUS / radius, TARGET_RADIUS / radius );
-
-	geometry.computeBoundingSphere();
-	return geometry;
-
-}
-
-// --- tools ------------------------------------------------------------------
-//
-// Every tool is built centred on the origin. `axis` is the local direction
-// that gets aimed into the form, and `reach` is how far the tool sticks out
-// from its centre along that direction — which is what turns "cut this deep"
-// into a position.
-
-const Y = new Vector3( 0, 1, 0 );
-const Z = new Vector3( 0, 0, 1 );
-
-function slotTool( rng, thickness, length ) {
-
-	const width = thickness * range( rng, 0.8, 2.6 );
-	const geometry = new BoxGeometry( width, length, thickness );
-	return { geometry, axis: Y.clone(), reach: length / 2 };
-
-}
-
-function wedgeTool( rng, thickness, length ) {
-
-	// A triangular prism: the angled cut, and the only tool that leaves a
-	// wall that is neither square to the form nor round.
-	const half = thickness * range( rng, 0.7, 1.8 );
-	const shape = new Shape();
-	shape.moveTo( - half, - length / 2 );
-	shape.lineTo( half, - length / 2 );
-	shape.lineTo( range( rng, - half, half ), length / 2 );
-	shape.closePath();
-
-	const depth = thickness * range( rng, 1.6, 3.4 );
-	const geometry = new ExtrudeGeometry( shape, { depth, bevelEnabled: false, curveSegments: 1 } );
-	geometry.translate( 0, 0, - depth / 2 );
-	return { geometry, axis: Y.clone(), reach: length / 2 };
-
-}
-
-const TOOLS = { slot: slotTool, wedge: wedgeTool };
-
-// --- measuring the solid ----------------------------------------------------
-
-/**
- * How far a ray fired into the form travels before leaving it for the last
- * time. This is what makes "straight through" and "stops inside" exact on a
- * form whose shape nobody knows in advance.
- */
-function farthestExit( geometry, origin, direction ) {
-
-	const position = geometry.getAttribute( 'position' ).array;
-	const indices = triangleIndices( geometry );
-
-	const edge1 = new Vector3(), edge2 = new Vector3();
-	const h = new Vector3(), s = new Vector3(), q = new Vector3();
-	const a = new Vector3(), b = new Vector3(), c = new Vector3();
-	let far = 0;
-
-	for ( let t = 0; t < indices.length; t += 3 ) {
-
-		a.fromArray( position, 3 * indices[ t ] );
-		b.fromArray( position, 3 * indices[ t + 1 ] );
-		c.fromArray( position, 3 * indices[ t + 2 ] );
-
-		edge1.subVectors( b, a );
-		edge2.subVectors( c, a );
-		h.crossVectors( direction, edge2 );
-		const determinant = edge1.dot( h );
-		if ( Math.abs( determinant ) < 1e-12 ) continue;
-
-		const inverse = 1 / determinant;
-		s.subVectors( origin, a );
-		const u = inverse * s.dot( h );
-		if ( u < 0 || u > 1 ) continue;
-
-		q.crossVectors( s, edge1 );
-		const v = inverse * direction.dot( q );
-		if ( v < 0 || u + v > 1 ) continue;
-
-		const distance = inverse * edge2.dot( q );
-		if ( distance > far ) far = distance;
-
-	}
-
-	return far;
-
-}
-
-/**
- * How many separate solids a geometry describes. A cut that saws the form in
- * two passes every volume check there is — the halves are still there — so
- * this is the only thing standing between the exercise and two forms lying
- * next to each other.
- */
 export function componentCount( geometry ) {
 
 	const position = geometry.getAttribute( 'position' );
@@ -311,12 +105,6 @@ export function componentCount( geometry ) {
 
 }
 
-// --- ghost lines ------------------------------------------------------------
-
-/**
- * A solid's hard edges, chained into polylines rather than left as loose
- * segments — an arc in the profile is one line to draw, not twenty.
- */
 function wireframe( geometry ) {
 
 	const segments = buildEdgeData( geometry ).hardSegments;
@@ -362,92 +150,6 @@ function transformPolyline( points, matrix ) {
 
 }
 
-/** Lines for a ghosted tool, in the place it cut. */
-function toolGhost( tool, matrix ) {
-
-	return wireframe( tool.geometry ).map( points => transformPolyline( points, matrix ) );
-
-}
-
-// --- carving ----------------------------------------------------------------
-
-/**
- * Place one tool against the form and return the carved result, or null if
- * this attempt was not worth keeping.
- */
-function attemptCut( rng, cfg, geometry, sampler, volume, size ) {
-
-	const point = new Vector3();
-	const normal = new Vector3();
-	sampler( rng, point, normal );
-
-	// Aim into the form, tilted off the surface normal so cuts are not all
-	// square to the face they enter.
-	const aim = normal.clone().negate().normalize();
-	const sideways = new Vector3().crossVectors( aim, Math.abs( aim.y ) > 0.9 ? Z : Y ).normalize();
-	aim.applyAxisAngle( sideways, range( rng, - cfg.tilt, cfg.tilt ) * DEG )
-		.applyAxisAngle( normal, rng() * Math.PI * 2 ).normalize();
-
-	const thickness = farthestExit( geometry, point.clone().addScaledVector( aim, 1e-4 ), aim );
-	if ( thickness < size * 0.05 ) return null;
-
-	// Every cut is driven straight through: deep enough to come out of the
-	// far wall the ray found, and long enough to still stick out of the face
-	// it went in by.
-	const kind = pick( rng, cfg.tools );
-	const depth = thickness + size * 0.25;
-	const length = depth + size * 0.5;
-
-	const tool = TOOLS[ kind ]( rng, size * range( rng, 0.16, 0.42 ), length );
-
-	// Aim the tool's own axis down the line of the cut, then spin it about
-	// that line so a slot is not always square to the world.
-	const orientation = new Quaternion()
-		.setFromAxisAngle( aim, rng() * Math.PI * 2 )
-		.multiply( new Quaternion().setFromUnitVectors( tool.axis, aim ) );
-
-	// The tool reaches `reach` beyond its own centre, so putting its deepest
-	// point at `depth` below the entry fixes the centre exactly.
-	const position = point.clone().addScaledVector( aim, depth - tool.reach );
-
-	const matrix = new Matrix4().compose( position, orientation, new Vector3( 1, 1, 1 ) );
-	const placed = tool.geometry.clone().applyMatrix4( matrix );
-
-	const carved = subtract( makeBrush( geometry ), makeBrush( placed ) );
-	if ( ! carved ) {
-
-		placed.dispose();
-		tool.geometry.dispose();
-		return null;
-
-	}
-
-	const bite = ( volume - meshVolume( carved ) ) / volume;
-
-	if ( bite < cfg.bite[ 0 ] || bite > cfg.bite[ 1 ] || componentCount( carved ) !== 1 ) {
-
-		carved.dispose();
-		placed.dispose();
-		tool.geometry.dispose();
-		return null;
-
-	}
-
-	const ghost = toolGhost( tool, matrix );
-	placed.dispose();
-	tool.geometry.dispose();
-
-	return { geometry: carved, bite, ghost, kind };
-
-}
-
-/**
- * Give the carved result real edge adjacency. The booleans leave T-junctions
- * where a re-triangulated face meets an untouched one, and every line the
- * drawing is made of comes from edge adjacency — so this runs once at the
- * end, on the geometry that will actually be drawn, rather than on every
- * intermediate the solver throws away.
- */
 function manifold( geometry ) {
 
 	const repaired = repairTJunctions( geometry );
@@ -463,64 +165,62 @@ function manifold( geometry ) {
 
 }
 
-/**
- * @returns {{ geometry, cuts: number, removed: number,
- *   ghost: { solid: Float32Array[], cuts: Float32Array[] } }}
- *   `geometry` is world-baked and ready for `FormScene.createForm()`.
- */
-export function generateSubtraction( rng = Math.random ) {
-
-	const cfg = CONFIG;
-	const base = normalise( extrudedBase( rng ) );
-	const size = base.boundingSphere.radius;
-	const solidGhost = wireframe( base );
-
-	let geometry = base;
-	let volume = meshVolume( base );
-	const startVolume = volume;
-	const wanted = randInt( rng, cfg.cuts[ 0 ], cfg.cuts[ 1 ] );
+/** Build a candidate, keeping only substantial cuts that leave a connected solid. */
+function generateCandidate( rng, level ) {
+	const size = [ range( rng, 1.5, 3 ), range( rng, 1.4, 2.8 ), range( rng, 1, 2.5 ) ];
+	const [ width, height, depth ] = size;
+	const corners = randomCorners( width, height, rng );
+	let geometry = cornerBox( width, height, depth, corners );
+	const startVolume = meshVolume( geometry );
+	let volume = startVolume;
+	const wanted = level.cuts[ 0 ] + Math.floor( rng() * ( level.cuts[ 1 ] - level.cuts[ 0 ] + 1 ) );
+	const operations = [];
 	const cutGhosts = [];
-	let made = 0;
+	const solidGhost = wireframe( geometry );
 
-	for ( let i = 0; i < wanted; i ++ ) {
-
-		// Sampling the surface *as it now is* is what makes later cuts run
-		// into earlier ones: once a pocket is open, its walls are as likely a
-		// place to start from as the original outside of the form.
-		const sampler = buildSurfaceSampler( geometry );
-		let cut = null;
-
-		for ( let attempt = 0; attempt < ATTEMPTS_PER_CUT && ! cut; attempt ++ ) {
-
-			cut = attemptCut( rng, cfg, geometry, sampler, volume, size );
-
-		}
-
-		if ( ! cut ) continue;
-
-		const after = meshVolume( cut.geometry );
-		if ( 1 - after / startVolume > cfg.budget ) {
-
-			cut.geometry.dispose();
+	for ( let attempt = 0; attempt < wanted * 18 && operations.length < wanted; attempt ++ ) {
+		const tool = randomTool( size, level, rng, operations.length === 0 );
+		const carved = subtract( makeBrush( geometry ), makeBrush( tool.geometry ) );
+		const after = carved ? meshVolume( carved ) : 0;
+		const bite = ( volume - after ) / startVolume;
+		if ( ! carved || bite < ( operations.length ? 0.015 : 0.04 ) ||
+			bite > 0.4 || after < startVolume * 0.45 || componentCount( carved ) !== 1 ) {
+			carved?.dispose();
+			tool.geometry.dispose();
 			continue;
-
 		}
-
-		if ( geometry !== base ) geometry.dispose();
-		geometry = cut.geometry;
+		cutGhosts.push( ...wireframe( tool.geometry ) );
+		geometry.dispose();
+		geometry = carved;
 		volume = after;
-		cutGhosts.push( ...cut.ghost );
-		made ++;
-
+		tool.geometry.dispose();
+		const { geometry: discarded, ...parameters } = tool;
+		operations.push( parameters );
 	}
 
-	if ( geometry !== base ) base.dispose();
-
+	const scale = TARGET_RADIUS / ( Math.hypot( ...size ) / 2 );
+	const matrix = new Matrix4().makeScale( scale, scale, scale );
+	geometry = manifold( geometry );
+	geometry.applyMatrix4( matrix );
 	return {
-		geometry: manifold( geometry ),
-		cuts: made,
-		removed: 1 - volume / startVolume,
-		ghost: { solid: solidGhost, cuts: cutGhosts },
+		geometry, cuts: operations.length, removed: 1 - volume / startVolume,
+		level: level.id, corners, operations, scale,
+		ghost: {
+			solid: solidGhost.map( points => transformPolyline( points, matrix ) ),
+			cuts: cutGhosts.map( points => transformPolyline( points, matrix ) ),
+		},
 	};
+}
 
+export function generateSubtraction( rng = Math.random, levelId = 'easier' ) {
+	const level = LEVELS.find( entry => entry.id === levelId );
+	if ( ! level ) throw new Error( `Unknown carve level: ${levelId}` );
+	// Retry a fresh randomized solid if the remaining material could not
+	// accommodate enough cuts. There is no fallback to a canned arrangement.
+	for ( let attempt = 0; attempt < 6; attempt ++ ) {
+		const result = generateCandidate( rng, level );
+		if ( result.cuts >= level.cuts[ 0 ] ) return result;
+		result.geometry.dispose();
+	}
+	throw new Error( 'Could not generate a connected carved form at this level.' );
 }

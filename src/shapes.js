@@ -1,4 +1,4 @@
-// The five forms, plus the construction lines an artist would block in before
+// The forms, plus the construction lines an artist would block in before
 // drawing them. Geometry is always built centred on the origin; placement
 // bakes the transform in afterwards.
 //
@@ -7,18 +7,20 @@
 // its contour and any intersection curve within a few tenths of a percent of
 // the true surface.
 
-import { BoxGeometry, ConeGeometry, IcosahedronGeometry, Vector3 } from 'three';
+import { BoxGeometry, ConeGeometry, CylinderGeometry, IcosahedronGeometry, Vector3 } from 'three';
 
 export const SHAPES = [
 	{ id: 'box', label: 'Box' },
 	{ id: 'boxProportions', label: 'Box — variable proportions' },
 	{ id: 'sphere', label: 'Sphere' },
 	{ id: 'cone', label: 'Cone' },
+	{ id: 'cylinder', label: 'Cylinder' },
 	{ id: 'pyramid', label: 'Pyramid' },
 ];
 
 const SPHERE_DETAIL = 7;   // 1280 triangles
 const CONE_SEGMENTS = 72;
+const CYLINDER_SEGMENTS = 72;
 
 const range = ( rng, min, max ) => min + rng() * ( max - min );
 
@@ -121,6 +123,27 @@ export function createShape( shapeId, rng ) {
 				segment( new Vector3( - radius, - height / 2, 0 ), new Vector3( radius, - height / 2, 0 ) ),
 				segment( new Vector3( 0, - height / 2, - radius ), new Vector3( 0, - height / 2, radius ) ),
 			];
+			break;
+
+		}
+
+		case 'cylinder': {
+
+			const radius = range( rng, 0.55, 0.95 );
+			const height = range( rng, 1.5, 2.6 );
+			geometry = new CylinderGeometry( radius, radius, height, CYLINDER_SEGMENTS );
+			construction = [
+				segment( new Vector3( 0, - height / 2, 0 ), new Vector3( 0, height / 2, 0 ) ),
+			];
+			for ( const y of [ - height / 2, height / 2 ] ) {
+
+				construction.push(
+					circle( new Vector3( 0, y, 0 ), X, Z, radius ),
+					segment( new Vector3( - radius, y, 0 ), new Vector3( radius, y, 0 ) ),
+					segment( new Vector3( 0, y, - radius ), new Vector3( 0, y, radius ) ),
+				);
+
+			}
 			break;
 
 		}

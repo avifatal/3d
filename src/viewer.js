@@ -96,6 +96,16 @@ export class Viewer {
 			} ),
 		};
 
+		// Shared faint variants follow the live palette, widths and resolution.
+		this.faintMaterials = new Map( Object.values( this.materials ).map( material => {
+
+			const faint = material.clone();
+			faint.transparent = true;
+			faint.depthWrite = false;
+			return [ material, faint ];
+
+		} ) );
+
 		this.horizon = new HorizonLine( container );
 
 		this.grid = null;
@@ -118,7 +128,30 @@ export class Viewer {
 
 	}
 
+	setCameraLocked( locked ) {
+
+		this.controls.enableRotate = ! locked;
+		if ( ! locked ) return;
+
+		// Clear any remaining orbit inertia without changing the current view.
+		const position = this.camera.position.clone();
+		const target = this.controls.target.clone();
+		const damping = this.controls.enableDamping;
+		this.controls.enableDamping = false;
+		this.controls.update();
+		this.camera.position.copy( position );
+		this.controls.target.copy( target );
+		this.controls.update();
+		this.controls.enableDamping = damping;
+
+	}
+
 	rebuildGrid() {
+
+		// A palette change throws the grid away and builds another one. The
+		// **Ground grid** checkbox has to survive that, so the state travels
+		// with it rather than being reset to whatever a new helper starts as.
+		const visible = this.grid ? this.grid.visible : true;
 
 		if ( this.grid ) {
 
@@ -129,6 +162,7 @@ export class Viewer {
 		}
 
 		this.grid = new GridHelper( 24, 24, this.theme.grid, this.theme.grid );
+		this.grid.visible = visible;
 		this.grid.material.transparent = true;
 		this.grid.material.opacity = 0.5;
 		this.grid.material.depthWrite = false;
@@ -295,6 +329,12 @@ export class Viewer {
 		if ( width === 0 || height === 0 ) return;
 
 		this.renderer.setSize( width, height );
+		// Preserve the user's relative zoom when the tool sheet or orientation
+		// changes which dimension limits the view.
+		const tangent = Math.tan( this.camera.fov * Math.PI / 360 );
+		const oldAngle = Math.atan( tangent * Math.min( 1, this.camera.aspect ) );
+		const newAngle = Math.atan( tangent * Math.min( 1, width / height ) );
+		this.camera.position.sub( this.controls.target ).multiplyScalar( Math.sin( oldAngle ) / Math.sin( newAngle ) ).add( this.controls.target );
 		this.camera.aspect = width / height;
 		this.camera.updateProjectionMatrix();
 
@@ -320,6 +360,14 @@ export class Viewer {
 		}
 
 		this.horizon.update( this.camera, this.container.clientHeight );
+		for ( const [ material, faint ] of this.faintMaterials ) {
+
+			faint.color.copy( material.color );
+			faint.resolution.copy( material.resolution );
+			faint.linewidth = material.linewidth;
+			faint.opacity = material.opacity * 0.10;
+
+		}
 		this.renderer.render( this.scene, this.camera );
 
 	}
@@ -338,7 +386,9 @@ export class Viewer {
 
 		const centre = box.getCenter( new Vector3() );
 		const radius = box.getSize( new Vector3() ).length() / 2;
-		const distance = radius / Math.sin( ( this.camera.fov * Math.PI / 180 ) / 2 ) * 1.05;
+		// Portrait screens are limited by horizontal field of view.
+		const halfFov = Math.atan( Math.tan( this.camera.fov * Math.PI / 360 ) * Math.min( 1, this.camera.aspect ) );
+		const distance = radius / Math.sin( halfFov ) * 1.05;
 
 		const direction = new Vector3().subVectors( this.camera.position, this.controls.target );
 		if ( direction.lengthSq() < 1e-6 ) direction.set( 0.62, 0.29, 0.8 );

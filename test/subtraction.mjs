@@ -11,11 +11,11 @@
 // because a check that cannot demonstrate it detects the bug is not evidence
 // the bug is gone.
 
-import { BoxGeometry, BufferAttribute, BufferGeometry } from 'three';
+import { BoxGeometry, BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial, Raycaster, Vector3 } from 'three';
 import { repairTJunctions, triangleIndices, weldPositions } from '../src/geomutil.js';
 import { makeBrush, meshVolume, subtract } from '../src/intersections.js';
 import { buildEdgeData } from '../src/silhouette.js';
-import { componentCount, generateSubtraction, GUIDES } from '../src/subtraction.js';
+import { LEVELS, componentCount, generateSubtraction, GUIDES } from '../src/subtraction.js';
 
 // deterministic rng so a failure is reproducible
 function mulberry32(seed) {
@@ -160,4 +160,52 @@ console.log('one piece, edges paired, and no two forms alike\n');
       deterministic ? '' : ', NOT DETERMINISTIC'}`);
   console.log(`  ${ok ? 'PASS' : '*** FAIL ***'}`);
   if (!ok) process.exitCode = 1;
+}
+
+// Sample the procedural space at every level: actual mesh topology, a real
+// through-cut ray, complexity bounds, and diversity of independent parameters.
+for (const level of LEVELS) {
+  let valid = true, curved = 0, square = 0, pockets = 0, sideCuts = 0;
+  const radii = new Set(), positions = new Set(), signatures = new Set();
+  for (let seed = 1; seed <= 30; seed++) {
+    const result = generateSubtraction(mulberry32(seed * 4451), level.id);
+    const geometry = result.geometry;
+    const unmatchedRate = unmatchedIn(geometry) / (triangleIndices(geometry).length / 2);
+    valid &&= componentCount(geometry) === 1 && unmatchedRate < 0.005;
+    valid &&= result.cuts >= level.cuts[0] && result.cuts <= level.cuts[1];
+    valid &&= result.removed >= 0.04 && result.removed <= 0.55;
+    for (const r of result.corners) radii.add(r.toFixed(4));
+    signatures.add(`${meshVolume(geometry).toFixed(6)}|${triangleIndices(geometry).length}`);
+    for (const cut of result.operations) {
+      positions.add(`${cut.x.toFixed(4)},${cut.y.toFixed(4)}`);
+      if (cut.curved) curved++; else square++;
+      if (cut.pocket) pockets++;
+      if (cut.axis !== 2) sideCuts++;
+    }
+    const first = result.operations[0];
+    if (!first.pocket) {
+      const material = new MeshBasicMaterial({ side: DoubleSide });
+      const mesh = new Mesh(geometry, material);
+      const ray = new Raycaster(new Vector3(first.x * result.scale, first.y * result.scale, 10), new Vector3(0, 0, -1));
+      valid &&= ray.intersectObject(mesh).length === 0;
+      material.dispose();
+    }
+    if (!valid) console.log(`  failing procedural seed ${seed}, level ${level.id}, unmatched ${unmatchedRate}`);
+    geometry.dispose();
+  }
+  check(`${level.id}: connected, bounded, diverse cuts`, valid && signatures.size === 30 && radii.size > 20 && positions.size >= 30);
+  check(`${level.id}: mixed cutter shapes`, curved > 0 && square > 0);
+  check(`${level.id}: depth and face complexity`, level.id === 'easier' ? pockets === 0 && sideCuts === 0 : pockets > 0 && sideCuts > 0);
+}
+
+// A nearly collinear reversed sliver from a boolean must not add a crease
+// across a flat face. The long edge is shared with a healthy triangle.
+{
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array([
+    0,0,0, 1,0,0, 0,1,0,
+    1,0,0, 0,0,0, 0.5,0.000001,0,
+  ]), 3));
+  check('boolean slivers do not create stray face lines', buildEdgeData(geometry).hardSegments.length === 0);
+  geometry.dispose();
 }

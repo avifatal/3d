@@ -2,7 +2,7 @@
 <html lang="en" data-theme="paper">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Perspective Forms — drawing reference</title>
 <link rel="stylesheet" href="./style.css">
 </head>
@@ -10,12 +10,25 @@
 
 <div id="stage"></div>
 
-<aside id="panel">
-	<header>
-		<h1 id="exerciseTitle">Intersecting Forms</h1>
-		<p id="exerciseBlurb">Perspective drawing reference</p>
+<aside id="panel" aria-label="Drawing tools">
+	<header class="panel-header">
+		<div><span class="eyebrow">FORM STUDY</span><h1 id="exerciseTitle">Intersecting Forms</h1><p id="exerciseBlurb" class="sr-only">Perspective drawing reference</p></div>
+		<button id="toggleHelp" data-icon="help" aria-label="Show control hints" aria-pressed="false" title="Show control hints">Help</button>
+		<button id="togglePanel" data-icon="chevron" aria-label="Expand tools" aria-expanded="false" aria-controls="toolContent" title="Expand tools">Expand tools</button>
 	</header>
-
+	<div class="quick-tools" aria-label="Camera and scene actions">
+		<button id="fit" data-icon="fit" title="Fit view (F)">Fit view</button>
+		<button id="lockCamera" data-icon="lock" class="camera-lock" aria-pressed="false" title="Lock camera angle; zoom and pan stay available">Lock camera</button>
+		<button id="undo" data-icon="undo" title="Undo last object (Z)">Undo</button>
+		<button id="newScene" data-icon="refresh" title="Generate a new scene (N)">New scene</button>
+	</div>
+	<nav class="tool-tabs" aria-label="Tool categories">
+		<button data-tab="create" data-icon="cube" aria-controls="createTools" aria-pressed="true" class="with-label">Create</button>
+		<button data-tab="objects" data-icon="select" aria-controls="objectsTools" aria-pressed="false" class="with-label">Objects</button>
+		<button data-tab="style" data-icon="sliders" aria-controls="styleTools" aria-pressed="false" class="with-label">Style</button>
+	</nav>
+	<div id="toolContent">
+	<div id="createTools" class="tool-page" aria-label="Create tools">
 	<section>
 		<span class="field">Exercise</span>
 		<div class="segmented grid" id="exercise">
@@ -33,20 +46,20 @@
 			<button id="add" class="primary">Add</button>
 		</div>
 		<p class="note">Each new form is placed so it cuts into one already in the scene.</p>
-		<div class="row wrap">
+		<div class="row wrap generation-action">
 			<button id="regenerate">New scene</button>
 		</div>
 	</section>
 
 	<section data-exercise-panel="stacking" hidden>
-		<span class="field">Level</span>
-		<div class="segmented" id="level">
+		<span class="field">Difficulty</span>
+		<div class="segmented difficulty" id="level" role="group" aria-label="Difficulty">
 			<button data-level="easier" class="active">Easier</button>
 			<button data-level="harder">Harder</button>
 			<button data-level="hardest">Hardest</button>
 		</div>
 		<p class="note" id="levelNote"></p>
-		<div class="row wrap">
+		<div class="row wrap generation-action">
 			<button id="restack" class="primary">New arrangement</button>
 		</div>
 	</section>
@@ -57,8 +70,8 @@
 			<button data-arrangement="queue" class="active">Queue</button>
 			<button data-arrangement="matrix">Matrix</button>
 		</div>
-		<span class="field">Level</span>
-		<div class="segmented" id="queueLevel">
+		<span class="field">Difficulty</span>
+		<div class="segmented difficulty" id="queueLevel" role="group" aria-label="Difficulty">
 			<button data-level="easier" class="active">Easier</button>
 			<button data-level="harder">Harder</button>
 			<button data-level="hardest">Hardest</button>
@@ -68,32 +81,45 @@
 		<div class="row">
 			<select id="queueShape"></select>
 		</div>
-		<div class="row wrap">
+		<div class="row wrap generation-action">
 			<button id="requeue" class="primary">New arrangement</button>
 		</div>
 	</section>
 
 	<section data-exercise-panel="carving" hidden>
+		<span class="field">Difficulty</span>
+		<div class="segmented difficulty" id="carveLevel" role="group" aria-label="Difficulty">
+			<button data-level="easier" class="active">Easier</button>
+			<button data-level="harder">Harder</button>
+			<button data-level="hardest">Hardest</button>
+		</div>
+		<p class="note" id="carveLevelNote"></p>
 		<span class="field">Guides show</span>
 		<div class="segmented" id="carveGuides">
 			<button data-guides="solid" class="active">Solid</button>
 			<button data-guides="cuts">Solid + cuts</button>
 		</div>
 		<p class="note">What the form was carved from, drawn faint. Picking either switches <b>Construction guides</b> on; the checkbox below hides them again.</p>
-		<div class="row wrap">
+		<div class="row wrap generation-action">
 			<button id="recarve" class="primary">New form</button>
 		</div>
 	</section>
 
+	</div>
+	<div id="objectsTools" class="tool-page" aria-label="Object tools" hidden>
 	<section>
-		<span class="field">Scene</span>
-		<div class="row wrap">
-			<button id="fit">Fit view</button>
-			<button id="undo">Undo</button>
-			<button id="clear">Clear</button>
+		<label class="field" for="selectedObject">Selected object</label>
+		<div class="row"><select id="selectedObject"><option value="">Select an object…</option></select></div>
+		<p class="note">Click an object or choose it above. Hide leaves a 10% outline; Show restores it. Delete key deletes · H hides/shows · Esc deselects.</p>
+		<div class="row wrap object-actions">
+			<button id="hideSelected" disabled>Hide</button>
+			<button id="deleteSelected" disabled>Delete</button>
 		</div>
+		<div class="row wrap"><button id="clear" data-icon="clear" class="with-label" title="Remove all objects">Clear scene</button></div>
 	</section>
 
+	</div>
+	<div id="styleTools" class="tool-page" aria-label="Style tools" hidden>
 	<section>
 		<span class="field">Line style</span>
 		<div class="segmented" id="mode">
@@ -129,9 +155,11 @@
 		</div>
 	</section>
 
+	</div>
+	</div>
 	<footer>
-		<p id="status">—</p>
-		<p class="note">Drag to orbit · scroll to zoom · right-drag or two fingers to pan</p>
+		<p id="status" role="status">—</p>
+		<p class="note" id="cameraHelp">Drag to orbit · pinch or scroll to zoom · right-drag or two fingers to pan</p>
 		<p class="note keys"><b>E</b> exercise · <b>N</b> new scene · <b>Q</b> queue/matrix · <b>Z</b> undo · <b>X</b> line style · <b>F</b> fit</p>
 	</footer>
 </aside>

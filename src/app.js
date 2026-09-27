@@ -136,6 +136,8 @@ export class FormScene {
 		this.forms = [];
 		this.intersections = [];
 		this.nextId = 1;
+		this.selected = null;
+		this.onChange = () => {};
 
 		this.showConstruction = false;
 		this.showIntersections = true;
@@ -171,6 +173,7 @@ export class FormScene {
 			sampler: buildSurfaceSampler( geometry ),
 			edgeData,
 			links: 0,
+			faint: false,
 		};
 
 		form.mesh = new Mesh( geometry, this.viewer.surfaceMaterial );
@@ -219,6 +222,7 @@ export class FormScene {
 		this.applyMode();
 		this.viewer.lastEye.set( Infinity, 0, 0 );
 
+		this.onChange();
 		return form;
 
 	}
@@ -408,11 +412,11 @@ export class FormScene {
 	 * @param {'solid'|'cuts'} guides  what the construction lines ghost
 	 * @returns {{ cuts: number, removed: number }}
 	 */
-	carve( guides ) {
+	carve( guides, level = 'easier' ) {
 
 		this.clear();
 
-		const result = generateSubtraction( this.rng );
+		const result = generateSubtraction( this.rng, level );
 		result.geometry.computeBoundingSphere();
 
 		this.carveGhost = result.ghost;
@@ -454,10 +458,43 @@ export class FormScene {
 
 	}
 
+	select( form ) {
+
+		this.selected = this.forms.includes( form ) ? form : null;
+		this.onChange();
+
+	}
+
+	setFaint( form, faint ) {
+
+		if ( ! this.forms.includes( form ) ) return;
+		form.faint = faint;
+		// Keep the mesh for picking, but remove its occlusion and shadow.
+		form.mesh.visible = ! faint;
+		form.mesh.castShadow = ! faint;
+		this.applyMode();
+		this.onChange();
+
+	}
+
 	removeLast() {
 
-		const form = this.forms.pop();
-		if ( ! form ) return false;
+		return this.removeForm( this.forms.at( - 1 ) );
+
+	}
+
+	removeForm( form ) {
+
+		const index = this.forms.indexOf( form );
+		if ( index < 0 ) return false;
+		this.forms.splice( index, 1 );
+		if ( this.selected === form ) this.selected = null;
+		if ( this.carveForm === form ) {
+
+			this.carveForm = null;
+			this.carveGhost = null;
+
+		}
 
 		this.intersections = this.intersections.filter( entry => {
 
@@ -477,6 +514,7 @@ export class FormScene {
 		form.geometry.dispose();
 
 		this.refreshGround();
+		this.onChange();
 		return true;
 
 	}
@@ -547,12 +585,28 @@ export class FormScene {
 
 	}
 
+	setLinesFaint( lines, faint ) {
+
+		const objects = lines.objects ?? [ lines.visible, lines.hidden ];
+		for ( const object of objects ) {
+
+			object.userData.normalMaterial ??= object.material;
+			const normal = object.userData.normalMaterial;
+			object.material = faint ? this.viewer.faintMaterials.get( normal ) : normal;
+
+		}
+
+	}
+
 	applyMode() {
 
 		const showHidden = this.viewer.mode === 'xray';
 
 		for ( const form of this.forms ) {
 
+			this.setLinesFaint( form.hardLines, form.faint );
+			this.setLinesFaint( form.contourLines, form.faint );
+			this.setLinesFaint( form.constructionLines, form.faint );
 			form.hardLines.setHiddenVisible( showHidden );
 			form.contourLines.setHiddenVisible( showHidden );
 			form.constructionLines.setHiddenVisible( showHidden && this.showConstruction );
@@ -561,6 +615,7 @@ export class FormScene {
 
 		for ( const entry of this.intersections ) {
 
+			this.setLinesFaint( entry.curve, entry.a.faint || entry.b.faint );
 			entry.curve.setHiddenVisible( showHidden && this.showIntersections );
 
 		}

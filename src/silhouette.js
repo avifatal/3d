@@ -65,7 +65,12 @@ export function buildEdgeData( geometry, creaseAngle = 18 ) {
 		// noise gives it one anyway, at a wild angle to whatever it sits
 		// beside, so it is recorded as having none and left out of every
 		// crease it touches.
-		degenerate[ t ] = length < 1e-12 ? 1 : 0;
+		// Boolean cuts can leave long slivers thinner than the weld
+		// tolerance. Their winding can flip after welding, inventing a
+		// crease across an otherwise flat face (especially beside holes).
+		const longestEdge = Math.max( Math.hypot( abx, aby, abz ), Math.hypot( acx, acy, acz ),
+			Math.hypot( acx - abx, acy - aby, acz - abz ) );
+		degenerate[ t ] = length < Math.max( 1e-12, longestEdge * 1e-5 ) ? 1 : 0;
 
 		faceNormals[ 3 * t ] = nx / ( length || 1 );
 		faceNormals[ 3 * t + 1 ] = ny / ( length || 1 );

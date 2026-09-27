@@ -1,9 +1,12 @@
+import { Box3, Box3Helper, Raycaster, Vector2 } from 'three';
 import { FormScene } from './app.js';
+import { rememberPanel, restorePanel } from './prefs.js';
 import { ARRANGEMENTS, LEVELS as QUEUE_LEVELS, SHAPE_IDS as QUEUE_SHAPE_IDS } from './queueing.js';
 import { SHAPES } from './shapes.js';
 import { LEVELS } from './stacking.js';
-import { GUIDES } from './subtraction.js';
+import { GUIDES, LEVELS as CARVE_LEVELS } from './subtraction.js';
 import { Viewer } from './viewer.js';
+import { initToolbar, labelButton } from './toolbar.js';
 
 const INITIAL_FORMS = 3;
 
@@ -11,6 +14,7 @@ const $ = id => document.getElementById( id );
 
 const viewer = new Viewer( $( 'stage' ) );
 const scene = new FormScene( viewer );
+initToolbar( viewer );
 
 const shapeSelect = $( 'shape' );
 const addButton = $( 'add' );
@@ -38,6 +42,12 @@ fillShapes( queueShapeSelect, [
 	...QUEUE_SHAPE_IDS.map( id => [ id, shapeLabel( id ) ] ),
 	[ 'random', 'Random' ],
 ] );
+
+// Last visit's panel, written back into the markup before a single control is
+// read. Everything downstream — the sliders, the checkboxes, the block at the
+// foot of the file — goes on taking the page as it finds it, so there is
+// still exactly one place a default is written, and it is `index.html`.
+restorePanel();
 
 // --- exercises -------------------------------------------------------------
 
@@ -107,6 +117,7 @@ let arrangement = ARRANGEMENTS[ 0 ].id;
 let lastStack = { boxes: 0, stacks: 0, leaners: 0 };
 let lastQueue = { forms: 0, rows: 0, columns: 0, shapeId: QUEUE_SHAPE_IDS[ 0 ] };
 let carveGuides = GUIDES[ 0 ].id;
+let carveLevel = CARVE_LEVELS[ 0 ].id;
 let lastCarve = { cuts: 0, removed: 0 };
 
 const PLURALS = { box: 'boxes' };
@@ -161,7 +172,7 @@ function requeue() {
 
 function carve() {
 
-	lastCarve = scene.carve( carveGuides );
+	lastCarve = scene.carve( carveGuides, carveLevel );
 
 }
 
@@ -381,12 +392,125 @@ $( 'carveGuides' ).addEventListener( 'click', event => {
 
 } );
 
+function setCarveLevel( id ) {
+
+	carveLevel = id;
+	for ( const button of $( 'carveLevel' ).children ) {
+
+		button.classList.toggle( 'active', button.dataset.level === id );
+
+	}
+	$( 'carveLevelNote' ).textContent = CARVE_LEVELS.find( entry => entry.id === id ).note;
+	withBusyState( () => { carve(); report(); } );
+
+}
+
+$( 'carveLevel' ).addEventListener( 'click', event => {
+
+	const button = event.target.closest( 'button[data-level]' );
+	if ( button ) setCarveLevel( button.dataset.level );
+
+} );
+
 $( 'recarve' ).addEventListener( 'click', () => withBusyState( () => {
 
 	carve();
 	report();
 
 } ) );
+
+// --- object selection ------------------------------------------------------
+
+const objectSelect = $( 'selectedObject' );
+const selectionBox = new Box3Helper( new Box3(), 0xc23b17 );
+selectionBox.material.depthTest = false;
+selectionBox.material.transparent = true;
+selectionBox.material.opacity = 0.55;
+selectionBox.material.depthWrite = false;
+selectionBox.renderOrder = 3;
+selectionBox.visible = false;
+viewer.scene.add( selectionBox );
+
+scene.onChange = () => {
+
+	objectSelect.replaceChildren( new Option( 'Select an object…', '' ) );
+	for ( const form of scene.forms ) {
+
+		objectSelect.add( new Option( `${form.label} #${form.id}${form.faint ? ' (hidden)' : ''}`, String( form.id ) ) );
+
+	}
+	objectSelect.value = scene.selected ? String( scene.selected.id ) : '';
+	$( 'deleteSelected' ).disabled = ! scene.selected;
+	$( 'hideSelected' ).disabled = ! scene.selected;
+	labelButton( $( 'hideSelected' ), scene.selected?.faint ? 'Show object (H)' : 'Hide object (H)', scene.selected?.faint ? 'eye' : 'eyeOff' );
+	$( 'hideSelected' ).setAttribute( 'aria-pressed', String( !! scene.selected?.faint ) );
+	selectionBox.visible = !! scene.selected && ! scene.selected.faint;
+	if ( scene.selected ) selectionBox.box.copy( scene.selected.box );
+
+};
+
+objectSelect.addEventListener( 'change', () => {
+
+	scene.select( scene.forms.find( form => String( form.id ) === objectSelect.value ) );
+
+} );
+
+function deleteSelected() {
+
+	if ( scene.removeForm( scene.selected ) ) report( 'object deleted' );
+
+}
+
+function toggleSelected() {
+
+	if ( ! scene.selected ) return;
+	scene.setFaint( scene.selected, ! scene.selected.faint );
+	report( scene.selected.faint ? 'object hidden' : 'object restored' );
+
+}
+
+$( 'deleteSelected' ).addEventListener( 'click', deleteSelected );
+$( 'hideSelected' ).addEventListener( 'click', toggleSelected );
+
+const canvas = viewer.renderer.domElement;
+const raycaster = new Raycaster();
+let press = null;
+const pointers = new Set();
+canvas.addEventListener( 'pointerdown', event => {
+
+	pointers.add( event.pointerId );
+	press = pointers.size === 1 && event.button === 0
+		? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
+
+} );
+canvas.addEventListener( 'pointermove', event => {
+
+	if ( press && Math.hypot( event.clientX - press.x, event.clientY - press.y ) > 5 ) press = null;
+
+} );
+canvas.addEventListener( 'pointercancel', event => {
+
+	pointers.delete( event.pointerId );
+	press = null;
+
+} );
+canvas.addEventListener( 'pointerup', event => {
+
+	pointers.delete( event.pointerId );
+	const click = press;
+	press = null;
+	if ( ! click || click.id !== event.pointerId ) return;
+	const rect = canvas.getBoundingClientRect();
+	raycaster.setFromCamera( new Vector2(
+		( event.clientX - rect.left ) / rect.width * 2 - 1,
+		- ( event.clientY - rect.top ) / rect.height * 2 + 1,
+	), viewer.camera );
+	// Prefer visible forms so a hidden one never blocks selection behind it.
+	const hits = raycaster.intersectObjects( scene.forms.map( form => form.mesh ), false );
+	const forms = hits.map( hit => scene.forms.find( form => form.mesh === hit.object ) );
+	scene.select( forms.find( form => ! form.faint ) ?? forms[ 0 ] );
+
+} );
 
 // --- scene -----------------------------------------------------------------
 
@@ -405,6 +529,19 @@ $( 'clear' ).addEventListener( 'click', () => {
 } );
 
 $( 'fit' ).addEventListener( 'click', () => scene.frame() );
+$( 'newScene' ).addEventListener( 'click', () => withBusyState( () => { EXERCISES[ exercise ].start(); report(); } ) );
+
+$( 'lockCamera' ).addEventListener( 'click', () => {
+
+	const locked = viewer.controls.enableRotate;
+	viewer.setCameraLocked( locked );
+	$( 'lockCamera' ).setAttribute( 'aria-pressed', String( locked ) );
+	labelButton( $( 'lockCamera' ), locked ? 'Unlock camera angle' : 'Lock camera angle; zoom and pan stay available', locked ? 'lock' : 'unlock' );
+	$( 'cameraHelp' ).textContent = locked
+		? 'Camera angle locked · pinch or scroll to zoom · right-drag or two fingers to pan'
+		: 'Drag to orbit · pinch or scroll to zoom · right-drag or two fingers to pan';
+
+} );
 
 // --- shared rendering ------------------------------------------------------
 
@@ -429,14 +566,18 @@ $( 'mode' ).addEventListener( 'click', event => {
 
 } );
 
-$( 'theme' ).addEventListener( 'click', event => {
-
-	const button = event.target.closest( 'button[data-theme]' );
-	if ( ! button ) return;
+function selectTheme( button ) {
 
 	for ( const sibling of button.parentElement.children ) sibling.classList.toggle( 'active', sibling === button );
 	document.documentElement.dataset.theme = button.dataset.theme;
 	viewer.setTheme( button.dataset.theme );
+
+}
+
+$( 'theme' ).addEventListener( 'click', event => {
+
+	const button = event.target.closest( 'button[data-theme]' );
+	if ( button ) selectTheme( button );
 
 } );
 
@@ -485,6 +626,34 @@ bindCheck( 'showConstruction', value => scene.setConstructionVisible( value ) );
 bindCheck( 'showGrid', value => viewer.setGridVisible( value ) );
 bindCheck( 'showHorizon', value => viewer.setHorizonVisible( value ) );
 
+// --- remembering the panel -------------------------------------------------
+
+/**
+ * One listener on the panel rather than a call out of every setter: a control
+ * added later is remembered without anyone having to remember to add it, and
+ * by the time a click reaches the panel on its way up, the handler that lit
+ * the button has already run.
+ */
+let pendingWrite = 0;
+
+function remember() {
+
+	// A dragged slider fires on every pixel; write once it settles.
+	clearTimeout( pendingWrite );
+	pendingWrite = setTimeout( rememberPanel, 200 );
+
+}
+
+for ( const type of [ 'click', 'change', 'input' ] ) $( 'panel' ).addEventListener( type, remember );
+
+// Leaving the page must not lose a write that is still waiting on its timer.
+window.addEventListener( 'pagehide', () => {
+
+	clearTimeout( pendingWrite );
+	rememberPanel();
+
+} );
+
 // --- keyboard --------------------------------------------------------------
 
 const ORDER = Object.keys( EXERCISES );
@@ -494,6 +663,7 @@ function setLevelHere( index ) {
 
 	if ( exercise === 'stacking' ) setLevel( LEVELS[ index ].id );
 	else if ( exercise === 'queue' ) setQueueLevel( QUEUE_LEVELS[ index ].id );
+	else if ( exercise === 'carving' ) setCarveLevel( CARVE_LEVELS[ index ].id );
 
 }
 
@@ -503,6 +673,10 @@ const SHORTCUTS = {
 	q: () => exercise === 'queue' && setArrangement( arrangement === 'queue' ? 'matrix' : 'queue' ),
 	n: () => withBusyState( () => { EXERCISES[ exercise ].start(); report(); } ),
 	z: () => { scene.removeLast(); report(); },
+	delete: deleteSelected,
+	backspace: deleteSelected,
+	h: toggleSelected,
+	escape: () => scene.select( null ),
 	f: () => scene.frame(),
 	x: () => $( 'mode' ).querySelector( 'button:not(.active)' ).click(),
 	1: () => setLevelHere( 0 ),
@@ -513,13 +687,14 @@ const SHORTCUTS = {
 window.addEventListener( 'keydown', event => {
 
 	if ( event.metaKey || event.ctrlKey || event.altKey ) return;
-	if ( event.target.matches( 'input, select, textarea' ) ) return;
+	if ( event.target.matches( 'input, select, textarea, [contenteditable="true"]' ) ) return;
 
 	const action = SHORTCUTS[ event.key.toLowerCase() ];
 	if ( ! action ) return;
 
 	event.preventDefault();
 	action();
+	remember();
 
 } );
 
@@ -529,12 +704,17 @@ selectMode( $( 'mode' ).querySelector( 'button.active' ) );
 level = $( 'level' ).querySelector( 'button.active' ).dataset.level;
 queueLevel = $( 'queueLevel' ).querySelector( 'button.active' ).dataset.level;
 arrangement = $( 'arrangement' ).querySelector( 'button.active' ).dataset.arrangement;
+carveLevel = $( 'carveLevel' ).querySelector( 'button.active' ).dataset.level;
+$( 'carveLevelNote' ).textContent = CARVE_LEVELS.find( entry => entry.id === carveLevel ).note;
 carveGuides = $( 'carveGuides' ).querySelector( 'button.active' ).dataset.guides;
+selectTheme( $( 'theme' ).querySelector( 'button.active' ) );
 levelNote.textContent = LEVELS.find( entry => entry.id === level ).note;
 describeQueue();
 
-scene.regenerate( INITIAL_FORMS );
-report();
+// Opening the exercise is the same job as switching to it, restored or not:
+// it lays out the panel, generates the first scene and sets the camera the
+// exercise wants.
+setExercise( $( 'exercise' ).querySelector( 'button.active' ).dataset.exercise );
 
 // Handle for tools/shot.mjs, which drives the page to verify rendering.
 window.__app = { viewer, scene };

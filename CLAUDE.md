@@ -139,6 +139,8 @@ The generator's own two rules — a cut takes a worthwhile bite and no more, and
 
 **A control that only changes something hidden reads as broken.** The carve panel's *Guides show* picks what the construction guides ghost, but nothing is on screen until the shared **Construction guides** checkbox — three sections further down — is ticked, and it starts off. Both choices redrew lines nobody could see. Picking either now switches that checkbox on through `showConstructionGuides()`, which keeps the input and `scene.setConstructionVisible()` in step; unticking it still hides them.
 
+**The panel is remembered between visits** (`src/prefs.js`, `localStorage`), and that does not move where defaults live. `restorePanel()` writes the stored choices back into the markup *before* any control is read, so `selectMode()`, `bindSlider()`, `bindCheck()` and the startup block go on taking the page as they find it — storage never carries a default of its own, and anything it cannot honour (a level that was renamed, a shape that was dropped, a number out of range) is left as `index.html` has it. Saving is one delegated listener on `#panel` rather than a call out of each setter, because a click reaching the panel on its way up has already been through the handler that lit the button; the keyboard shortcuts bypass that and say so explicitly. **Only the panel is stored — never the scene.** Coming back gives you the settings you left, on a freshly generated arrangement.
+
 Generators take an `rng` parameter (`Math.random` by default) so tests can seed them.
 
 ## Non-obvious constraints
@@ -156,6 +158,7 @@ These all cost real debugging time; changing them will reintroduce the bug named
 | Construction lines carry `polygonOffset` (`src/viewer.js`) | A guide often lies exactly on an edge of the form it was drawn from — the ghost of an uncut solid shares every edge the cutting left alone. At equal depth the winner is decided per frame and the form's own edge comes out stippled. |
 | Any boolean result goes through `repairTJunctions()` before its edges are read | CSG output is not manifold. Skip it and every flat face gets a line drawn across it. |
 | `Quaternion.angleTo` bottoms out around `3e-8` | `acos` is ill-conditioned at zero, so bit-identical orientations do not compare equal below that. `test/queueing.mjs` compares components where it means identity. |
+| `rebuildGrid()` carries the old grid's `visible` across | A palette change disposes the `GridHelper` and builds another. Drop the flag and the ground grid comes back after being switched off — at startup too, since restoring a palette rebuilds it. |
 | Shading's lit end is pinned to the background colour | That is what makes surface tone `0` *exactly* the flat fill rather than approximately it. Themes on a dark ground name their own `shadeColor`, since mixing toward the ink would make shaded faces lighter and invert the read. |
 
 ## When a test passes but the render is wrong

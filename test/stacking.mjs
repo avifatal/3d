@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { generateStacking, LEVELS, obbSeparation as shipped } from '../src/stacking.js';
 
@@ -328,3 +329,49 @@ for (const level of LEVELS) {
   console.log(`         ${ok ? 'PASS' : '*** FAIL ***'}`);
   if (!ok) process.exitCode = 1;
 }
+
+// Overhanging bases are allowed, but the combined load above each
+// contact stays inside that contact, assuming boxes of equal density.
+let overhangingScenes = 0;
+for (const level of LEVELS) {
+  for (let seed = 1; seed <= 300; seed++) {
+    const { boxes, leaners } = generateStacking(level.id, mulberry32(seed));
+    if (level.id === 'harder') {
+      assert.equal(leaners, 0);
+      assert.ok(boxes.every(box => box.kind === 'stacked'));
+      assert.ok(boxes.length >= 4 && boxes.length <= 6);
+    }
+    for (const box of boxes.filter(box => box.kind === 'stacked')) {
+      assert.ok(box.size.y <= Math.min(box.size.x, box.size.z) * 0.75 + 1e-9);
+      if (!box.level) continue;
+      const support = boxes.find(other => other.stack === box.stack && other.level === box.level - 1);
+      const inverse = support.quaternion.clone().invert();
+      let overhang = false;
+      for (const x of [-0.5, 0.5]) for (const z of [-0.5, 0.5]) {
+        const corner = new Vector3(x * box.size.x, -box.size.y / 2, z * box.size.z)
+          .applyQuaternion(box.quaternion).add(box.position).sub(support.position).applyQuaternion(inverse);
+        if (Math.abs(corner.x) > support.size.x / 2 + 0.02 ||
+            Math.abs(corner.z) > support.size.z / 2 + 0.02) overhang = true;
+        assert.ok(Math.abs(corner.y - support.size.y / 2) < 1e-9);
+      }
+      if (level.id === 'harder' && overhang) overhangingScenes++;
+      const load = boxes.filter(other => other.stack === box.stack && other.level >= box.level);
+      const centre = new Vector3();
+      let mass = 0;
+      for (const other of load) {
+        const weight = other.size.x * other.size.y * other.size.z;
+        centre.addScaledVector(other.position, weight);
+        mass += weight;
+      }
+      centre.divideScalar(mass);
+      const supported = centre.clone().sub(support.position).applyQuaternion(inverse);
+      assert.ok(Math.abs(supported.x) < support.size.x / 2);
+      assert.ok(Math.abs(supported.z) < support.size.z / 2);
+      centre.sub(box.position).applyQuaternion(box.quaternion.clone().invert());
+      assert.ok(Math.abs(centre.x) < box.size.x / 2);
+      assert.ok(Math.abs(centre.z) < box.size.z / 2);
+    }
+  }
+}
+assert.ok(overhangingScenes > 300, 'Harder should frequently have visible overhangs');
+console.log('Visible overhangs, stable upper loads, carton proportions, and no Harder leaners: PASS');

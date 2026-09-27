@@ -57,7 +57,7 @@ export const ARRANGEMENTS = [
 
 // A sphere is left out on purpose: it has no planes to reveal, so a queue of
 // them demonstrates nothing about the thing being studied.
-export const SHAPE_IDS = [ 'box', 'boxProportions', 'pyramid', 'cone' ];
+export const SHAPE_IDS = [ 'box', 'boxProportions', 'pyramid', 'cone', 'cylinder' ];
 
 /**
  * Which of the form's own axes the caller should lay its *smallest* dimension

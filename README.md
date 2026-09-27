@@ -31,7 +31,7 @@ below it is shared and keeps its settings when you switch.
 | Control | |
 | --- | --- |
 | **Exercise** | Intersecting ↔ Box stacking (`E`) |
-| *Intersecting:* **Shape** + **Add** | Box, box with variable proportions, sphere, cone, pyramid (`A`) |
+| *Intersecting:* **Shape** + **Add** | Box, box with variable proportions, sphere, cone, cylinder, pyramid (`A`) |
 | *Stacking:* **Level** | Easier · Harder · Hardest (`1` `2` `3`) |
 | *Queue:* **Arrangement** | Queue ↔ Matrix (`Q`) |
 | *Queue:* **Level** | Easier · Harder · Hardest (`1` `2` `3`) |
@@ -312,7 +312,7 @@ once; a merely-valid placement is only accepted once the good ones have had thei
 src/geomutil.js      vertex welding, polyline chaining
 src/intersections.js CSG intersection curve extraction
 src/silhouette.js    hard edges + view-dependent contours
-src/shapes.js        the five forms and their construction guides
+src/shapes.js        the forms and their construction guides
 src/placement.js     surface sampling and validated placement
 src/stacking.js      box stacking: contact solving and the three levels
 src/queueing.js      object queue & matrix: path frames and spacing solving
