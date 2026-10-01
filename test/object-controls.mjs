@@ -12,7 +12,7 @@ try {
  page.on( 'pageerror', error => errors.push( error.message ) );
  await page.goto( process.env.APP_URL || 'http://127.0.0.1:5179/' );
  await page.waitForFunction( () => window.__app?.scene.forms.length > 0 );
- for ( const exercise of [ 'intersecting', 'stacking', 'queue', 'carving' ] ) {
+ for ( const exercise of [ 'intersecting', 'stacking', 'queue', 'carving', 'ribbon' ] ) {
   await page.click( '[data-tab="create"]' );
   await page.click( `[data-exercise="${exercise}"]` );
   await page.waitForFunction( () => ! document.querySelector( '#add' ).disabled );

@@ -2,6 +2,7 @@ import { Box3, Box3Helper, Raycaster, Vector2 } from 'three';
 import { FormScene } from './app.js';
 import { rememberPanel, restorePanel } from './prefs.js';
 import { ARRANGEMENTS, LEVELS as QUEUE_LEVELS, SHAPE_IDS as QUEUE_SHAPE_IDS } from './queueing.js';
+import { LEVELS as RIBBON_LEVELS } from './ribbon.js';
 import { SHAPES } from './shapes.js';
 import { LEVELS } from './stacking.js';
 import { GUIDES, LEVELS as CARVE_LEVELS } from './subtraction.js';
@@ -111,8 +112,16 @@ const EXERCISES = {
 
 		},
 	},
+	ribbon: {
+		title: 'Ribbon',
+		blurb: 'A flowing strip turning through space',
+		start: () => ribbon(),
+		summary: () => scene.forms.length ? `1 ribbon · ${count( lastRibbon.bends, 'bend' )}` : '0 ribbons',
+	},
 };
 
+let ribbonLevel = RIBBON_LEVELS[ 0 ].id;
+let lastRibbon = { bends: 0 };
 let exercise = 'intersecting';
 let level = LEVELS[ 0 ].id;
 let queueLevel = QUEUE_LEVELS[ 0 ].id;
@@ -422,6 +431,35 @@ $( 'recarve' ).addEventListener( 'click', () => withBusyState( () => {
 
 } ) );
 
+// --- ribbons ---------------------------------------------------------------
+
+function ribbon() {
+
+	lastRibbon = scene.ribbon( ribbonLevel );
+
+}
+
+function setRibbonLevel( id ) {
+
+	ribbonLevel = id;
+	for ( const button of $( 'ribbonLevel' ).children ) {
+
+		button.classList.toggle( 'active', button.dataset.level === id );
+
+	}
+	$( 'ribbonLevelNote' ).textContent = RIBBON_LEVELS.find( entry => entry.id === id ).note;
+	withBusyState( () => { ribbon(); report(); } );
+
+}
+
+$( 'ribbonLevel' ).addEventListener( 'click', event => {
+
+	const button = event.target.closest( 'button[data-level]' );
+	if ( button ) setRibbonLevel( button.dataset.level );
+
+} );
+$( 'reribbon' ).addEventListener( 'click', () => withBusyState( () => { ribbon(); report(); } ) );
+
 // --- object selection ------------------------------------------------------
 
 const objectSelect = $( 'selectedObject' );
@@ -664,7 +702,8 @@ const ORDER = Object.keys( EXERCISES );
 /** Levels are per exercise, so the number keys go wherever the user is. */
 function setLevelHere( index ) {
 
-	if ( exercise === 'stacking' ) setLevel( LEVELS[ index ].id );
+	if ( exercise === 'ribbon' ) setRibbonLevel( RIBBON_LEVELS[ index ].id );
+	else if ( exercise === 'stacking' ) setLevel( LEVELS[ index ].id );
 	else if ( exercise === 'queue' ) setQueueLevel( QUEUE_LEVELS[ index ].id );
 	else if ( exercise === 'carving' ) setCarveLevel( CARVE_LEVELS[ index ].id );
 
@@ -704,6 +743,8 @@ window.addEventListener( 'keydown', event => {
 // The markup is the single source of truth for what starts active, so the
 // modules' own defaults can never drift away from the controls that are lit.
 selectMode( $( 'mode' ).querySelector( 'button.active' ) );
+ribbonLevel = $( 'ribbonLevel' ).querySelector( 'button.active' ).dataset.level;
+$( 'ribbonLevelNote' ).textContent = RIBBON_LEVELS.find( entry => entry.id === ribbonLevel ).note;
 level = $( 'level' ).querySelector( 'button.active' ).dataset.level;
 queueLevel = $( 'queueLevel' ).querySelector( 'button.active' ).dataset.level;
 arrangement = $( 'arrangement' ).querySelector( 'button.active' ).dataset.arrangement;

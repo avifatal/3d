@@ -4,6 +4,7 @@ const paths = {
  intersect: '<rect x="3" y="3" width="12" height="12" rx="2"/><rect x="9" y="9" width="12" height="12" rx="2"/>',
  stack: '<path d="m12 3 9 5-9 5-9-5Z M3 12l9 5 9-5 M3 16l9 5 9-5"/>',
  queue: '<rect x="2" y="9" width="5" height="7" rx="1"/><rect x="10" y="7" width="5" height="9" rx="1"/><path d="M18 5h4v11h-4"/>',
+ ribbon: '<path d="M4 5c6-8 6 22 16 12l-3-3C7 24 10-6 1 8Z"/>',
  carve: '<path d="M3 3h18v8h-8v10H3Z M13 11l-4-4 M21 3l-8 8"/>',
  plus: '<path d="M12 5v14 M5 12h14"/>',
  refresh: '<path d="M20 8a9 9 0 1 0 1 8 M20 3v6h-6"/>',
@@ -39,12 +40,12 @@ export function labelButton( button, label, icon, caption ) {
 
 export function initToolbar( viewer ) {
  const panel = document.getElementById( 'panel' );
- const icons = { add: 'plus', regenerate: 'refresh', restack: 'refresh', requeue: 'refresh', recarve: 'refresh', hideSelected: 'eyeOff', deleteSelected: 'trash' };
+ const icons = { add: 'plus', regenerate: 'refresh', restack: 'refresh', requeue: 'refresh', recarve: 'refresh', reribbon: 'refresh', hideSelected: 'eyeOff', deleteSelected: 'trash' };
  for ( const button of panel.querySelectorAll( 'button' ) ) {
   const d = button.dataset;
-  const icon = d.icon || icons[ button.id ] || ({ intersecting: 'intersect', stacking: 'stack', queue: 'queue', carving: 'carve' })[ d.exercise ] || d.level || ({ queue:'queue', matrix:'grid' })[ d.arrangement ] || d.guides || ({ hiddenLine: 'solid', xray:'xray' })[ d.mode ] || d.theme;
+  const icon = d.icon || icons[ button.id ] || ({ intersecting: 'intersect', stacking: 'stack', queue: 'queue', carving: 'carve', ribbon: 'ribbon' })[ d.exercise ] || d.level || ({ queue:'queue', matrix:'grid' })[ d.arrangement ] || d.guides || ({ hiddenLine: 'solid', xray:'xray' })[ d.mode ] || d.theme;
   const caption = button.textContent.trim();
-  if ( d.exercise || d.theme || [ 'regenerate', 'restack', 'requeue', 'recarve' ].includes( button.id ) ) button.classList.add( 'with-label' );
+  if ( d.exercise || d.theme || [ 'regenerate', 'restack', 'requeue', 'recarve', 'reribbon' ].includes( button.id ) ) button.classList.add( 'with-label' );
   labelButton( button, button.title || caption, icon, caption );
  }
  const mobile = matchMedia( '(max-width: 700px)' );

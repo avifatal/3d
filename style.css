@@ -150,7 +150,7 @@ button.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(
 	color: var(--panel);
 }
 
-/* Four exercises do not fit across the panel in one row. */
+/* Exercise choices share the available panel width. */
 .segmented.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .segmented.grid button { border-radius: 6px; border-left: 1px solid var(--panel-edge); }
 .segmented.grid button.active { border-color: var(--text); }
@@ -252,7 +252,7 @@ section { margin-top: 12px; padding-top: 12px; }
 section .row ~ .row { margin-top: 8px; }
 .segmented { gap: 4px; }
 .segmented button, .segmented button:first-child, .segmented button:last-child { border-radius: 9px; border: 1px solid var(--panel-edge); }
-.segmented.grid { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.segmented.grid { grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .segmented.difficulty {
 	gap: 4px;
 	padding: 4px;

@@ -1,6 +1,6 @@
 # Perspective Forms
 
-An interactive 3D reference for perspective drawing practice. Four exercises share one
+An interactive 3D reference for perspective drawing practice. Five exercises share one
 renderer and one set of drawing controls:
 
 * **Intersecting Forms** — add simple solids to a scene; each new one is placed so that
@@ -12,6 +12,13 @@ renderer and one set of drawing controls:
 * **Object Queue** — one form repeated along a path or over a sheet, at three
   difficulty levels, after the queueing half of the same workbook page. The forms float
   across eye level rather than resting on anything, and the path can bend.
+* **Ribbon** — an open paper strip with matching curved edges, inspired by
+  [these ribbon drawing warm-ups](https://practicedrawingthis.com/cgi-bin/carousel.cgi?section=online-tools&episode=2d-to-3d-warm-ups).
+  Easier has one broad bend, Harder deeper, uneven S-curves, and Hardest several
+  bends at stronger angles. Each bend has its own height and span, mixing large
+  and small curves within the same ribbon. Placement varies from tilted to upright. New ribbon randomizes proportions and orientation; 1–3
+  selects difficulty. Construction guides add cross-sections, while hidden-line
+  and X-ray modes let you study overlaps. Both sides support shading and picking.
 * **Form Subtraction** — a solid you have not seen before, carved by others. The solid
   is generated from a random profile rather than picked from a list, and the material
   taken out can be ghosted behind it.

@@ -36,6 +36,7 @@
 			<button data-exercise="stacking">Stack</button>
 			<button data-exercise="queue">Queue</button>
 			<button data-exercise="carving">Carve</button>
+			<button data-exercise="ribbon">Ribbon</button>
 		</div>
 	</section>
 
@@ -83,6 +84,20 @@
 		</div>
 		<div class="row wrap generation-action">
 			<button id="requeue" class="primary">New arrangement</button>
+		</div>
+	</section>
+
+	<section data-exercise-panel="ribbon" hidden>
+		<span class="field">Difficulty</span>
+		<div class="segmented difficulty" id="ribbonLevel" role="group" aria-label="Ribbon difficulty">
+			<button data-level="easier" class="active">Easier</button>
+			<button data-level="harder">Harder</button>
+			<button data-level="hardest">Hardest</button>
+		</div>
+		<p class="note" id="ribbonLevelNote"></p>
+		<p class="note">Construction guides show cross-sections across the strip. Press 1–3 to change difficulty.</p>
+		<div class="row wrap generation-action">
+			<button id="reribbon" class="primary">New ribbon</button>
 		</div>
 	</section>
 

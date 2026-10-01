@@ -31,8 +31,9 @@ const DEGENERATE_SQ = 1e-8;
 /**
  * @param {BufferGeometry} geometry world-baked (transform already applied)
  * @param {number} creaseAngle degrees; above this an edge is drawn as hard
+ * @param {boolean} openSurface preserve the boundary of an open sheet
  */
-export function buildEdgeData( geometry, creaseAngle = 18 ) {
+export function buildEdgeData( geometry, creaseAngle = 18, openSurface = false ) {
 
 	const position = geometry.getAttribute( 'position' );
 	const { verts, ids } = weldPositions( position.array, position.count, 1e-5 );
@@ -114,16 +115,22 @@ export function buildEdgeData( geometry, creaseAngle = 18 ) {
 	const creaseCos = Math.cos( creaseAngle * Math.PI / 180 );
 	const hard = [];
 
-	// Every solid drawn here is closed, so an edge with one face is not a
+	// Solid forms are closed, so an edge with one face is not a
 	// boundary — it is a boolean result whose two sides were triangulated
 	// differently, and drawing it puts a line straight across a flat face.
 	// An edge with three or more is the same story from coincident faces. So
 	// an edge is judged by the widest angle between the faces meeting along
-	// it, however many there are, and an unpaired one is left alone.
+	// it, however many there are, and an unpaired one is left alone unless
+	// this is an explicitly open surface such as a ribbon.
 	for ( const edge of edges.values() ) {
 
 		const faces = edge.faces.filter( face => ! degenerate[ face ] );
-		if ( faces.length < 2 ) continue;
+		if ( faces.length < 2 ) {
+
+			if ( openSurface && faces.length === 1 ) hard.push( edge );
+			continue;
+
+		}
 
 		let widest = 1;
 

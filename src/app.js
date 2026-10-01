@@ -1,13 +1,14 @@
 // Scene contents: forms, the curves between them, and the bookkeeping that
 // keeps the two in step when forms are added or removed.
 
-import { Box3, BoxGeometry, Matrix4, Mesh, Vector3 } from 'three';
+import { Box3, BoxGeometry, DoubleSide, Matrix4, Mesh, Vector3 } from 'three';
 import { CurveLines, RENDER_ORDER, SegmentLines } from './lines.js';
 import { intersectionCurves, makeBrush, meshVolume } from './intersections.js';
 import { buildSurfaceSampler, findPlacement } from './placement.js';
 import { createShape, SHAPES } from './shapes.js';
 import { buildEdgeData, extractContour, maxContourSegments } from './silhouette.js';
 import { generateQueue, SHAPE_IDS as QUEUE_SHAPE_IDS, THIN_AXIS } from './queueing.js';
+import { generateRibbon } from './ribbon.js';
 import { generateStacking } from './stacking.js';
 import { generateSubtraction } from './subtraction.js';
 
@@ -156,27 +157,37 @@ export class FormScene {
 	 * curves where it meets what is already there. Both exercises come
 	 * through here; they differ only in how the geometry was positioned.
 	 */
-	createForm( { geometry, construction = [], shapeId, label: name, radius, pairs } ) {
+	createForm( { geometry, construction = [], shapeId, label: name, radius, pairs, openSurface = false } ) {
 
 		const { scene } = this.viewer;
-		const edgeData = buildEdgeData( geometry );
+		const edgeData = buildEdgeData( geometry, 18, openSurface );
 
 		const form = {
 			id: this.nextId ++,
 			shapeId,
 			label: name,
 			geometry,
-			brush: makeBrush( geometry ),
+			brush: openSurface ? null : makeBrush( geometry ),
 			box: new Box3().setFromBufferAttribute( geometry.getAttribute( 'position' ) ),
-			volume: meshVolume( geometry ),
+			volume: openSurface ? 0 : meshVolume( geometry ),
 			radius,
-			sampler: buildSurfaceSampler( geometry ),
+			sampler: openSurface ? null : buildSurfaceSampler( geometry ),
 			edgeData,
 			links: 0,
 			faint: false,
 		};
 
 		form.mesh = new Mesh( geometry, this.viewer.surfaceMaterial );
+		if ( openSurface ) {
+
+			// Share lighting uniforms, but render and pick both sides of the paper.
+			const material = this.viewer.surfaceMaterial.clone();
+			material.uniforms = this.viewer.surfaceMaterial.uniforms;
+			material.side = DoubleSide;
+			form.mesh.material = material;
+			form.mesh.onBeforeRender = () => { material.colorWrite = this.viewer.surfaceMaterial.colorWrite; };
+
+		}
 		form.mesh.renderOrder = RENDER_ORDER.occluder;
 		form.mesh.castShadow = true;
 		form.mesh.receiveShadow = true;
@@ -240,7 +251,7 @@ export class FormScene {
 
 		for ( const other of this.forms ) {
 
-			if ( ! other.box.intersectsBox( box ) ) continue;
+			if ( ! other.brush || ! other.box.intersectsBox( box ) ) continue;
 			if ( overlapDepth( box, other.box ) < CONTACT_EPSILON ) continue;
 
 			const result = intersectionCurves( brush, other.brush );
@@ -437,6 +448,27 @@ export class FormScene {
 
 	}
 
+	/** Replace the scene with an open ribbon, without solid-volume CSG. */
+	ribbon( level = 'easier' ) {
+
+		const result = generateRibbon( level, this.rng );
+		this.clear();
+		this.createForm( {
+			geometry: result.geometry,
+			construction: result.construction,
+			shapeId: 'ribbon',
+			label: 'Ribbon',
+			radius: result.geometry.boundingSphere.radius,
+			pairs: [],
+			openSurface: true,
+		} );
+		this.groundLevel = null;
+		this.refreshGround();
+		this.frame();
+		return { bends: result.bends };
+
+	}
+
 	/**
 	 * Swap what the construction guides ghost without generating a new form —
 	 * the form on screen is the one being drawn, and changing what is shown
@@ -508,6 +540,7 @@ export class FormScene {
 		} );
 
 		form.mesh.removeFromParent();
+		if ( form.mesh.material !== this.viewer.surfaceMaterial ) form.mesh.material.dispose();
 		form.hardLines.dispose();
 		form.contourLines.dispose();
 		form.constructionLines.dispose();

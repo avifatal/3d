@@ -22,6 +22,7 @@ const SEGMENTED = {
 	arrangement: 'arrangement',
 	carveGuides: 'guides',
 	carveLevel: 'level',
+	ribbonLevel: 'level',
 	mode: 'mode',
 	theme: 'theme',
 };
