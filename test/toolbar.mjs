@@ -29,6 +29,14 @@ try {
  let rects = await layout();
  assert.ok( rects.stage.left >= rects.panel.right, 'desktop tools do not cover the canvas' );
  await screenshot( '/tmp/toolbar-desktop.png' );
+ await page.click( '#togglePanel' );
+ await draw();
+ assert.equal( await page.$eval( '#toolContent', el => el.hidden ), true );
+ assert.ok( ( await layout() ).stage.left < 100, 'desktop collapse returns space to the canvas' );
+ await page.click( '[data-tab="create"]' );
+ await draw();
+ assert.equal( await page.$eval( '#toolContent', el => el.hidden ), false );
+
  for ( const [ width, height ] of [ [390,844], [320,568], [768,1024], [844,390] ] ) {
   await page.setViewport( { width, height } );
   await page.waitForFunction( () => Math.abs( window.__app.viewer.camera.aspect - document.querySelector( '#stage' ).clientWidth / document.querySelector( '#stage' ).clientHeight ) < .001 );
@@ -78,6 +86,7 @@ try {
  await touch('touchEnd', []);
  assert.ok(Math.abs((await camera()).angle-before.angle)>.01, 'one finger orbits');
  await page.tap('#lockCamera');
+ await page.waitForFunction( () => !window.__app.viewer.controls.enableRotate );
  const locked = await camera();
  await touch('touchStart', [[120,150]]);
  await touch('touchMove', [[180,170]]);

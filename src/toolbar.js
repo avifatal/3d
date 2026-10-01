@@ -35,7 +35,7 @@ export function labelButton( button, label, icon, caption ) {
  button.setAttribute( 'aria-label', label );
  button.title = label;
  button.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[ icon ] || paths.cube}</svg><span class="button-label"></span>`;
- button.querySelector( 'span' ).textContent = caption || label;
+ button.querySelector( 'span' ).textContent = caption || ({ fit: 'Fit view', lockCamera: label.startsWith( 'Unlock' ) ? 'Unlock' : 'Lock view', newScene: 'New scene', hideSelected: label.startsWith( 'Show' ) ? 'Show' : 'Hide', deleteSelected: 'Delete' })[ button.id ] || label;
 }
 
 export function initToolbar( viewer ) {
@@ -44,11 +44,11 @@ export function initToolbar( viewer ) {
  for ( const button of panel.querySelectorAll( 'button' ) ) {
   const d = button.dataset;
   const icon = d.icon || icons[ button.id ] || ({ intersecting: 'intersect', stacking: 'stack', queue: 'queue', carving: 'carve', ribbon: 'ribbon' })[ d.exercise ] || d.level || ({ queue:'queue', matrix:'grid' })[ d.arrangement ] || d.guides || ({ hiddenLine: 'solid', xray:'xray' })[ d.mode ] || d.theme;
-  const caption = button.textContent.trim();
-  if ( d.exercise || d.theme || [ 'regenerate', 'restack', 'requeue', 'recarve', 'reribbon' ].includes( button.id ) ) button.classList.add( 'with-label' );
-  labelButton( button, button.title || caption, icon, caption );
+  const caption = ({ intersecting: 'Intersecting forms', stacking: 'Box stacking', queue: 'Object queue', carving: 'Form subtraction', ribbon: 'Ribbon' })[ d.exercise ] || button.textContent.trim();
+  if ( d.exercise || d.level || d.mode || d.guides || d.arrangement || d.theme || [ 'regenerate', 'restack', 'requeue', 'recarve', 'reribbon' ].includes( button.id ) ) button.classList.add( 'with-label' );
+  labelButton( button, button.title || caption, icon, ({ lockCamera: 'Lock view' })[ button.id ] || caption );
  }
- const mobile = matchMedia( '(max-width: 700px)' );
+ const mobile = matchMedia( '(max-width: 700px) and (min-height: 501px)' );
  const toggle = document.getElementById( 'togglePanel' );
  const content = document.getElementById( 'toolContent' );
  let expanded = ! mobile.matches;
@@ -56,6 +56,7 @@ export function initToolbar( viewer ) {
   expanded = value;
   panel.classList.toggle( 'is-expanded', value );
   content.hidden = ! value;
+  document.documentElement.dataset.toolsCollapsed = String( ! value );
   toggle.setAttribute( 'aria-expanded', String( value ) );
   labelButton( toggle, value ? 'Collapse tools' : 'Expand tools', 'chevron' );
  }
