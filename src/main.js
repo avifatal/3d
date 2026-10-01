@@ -7,6 +7,9 @@ import { LEVELS } from './stacking.js';
 import { GUIDES, LEVELS as CARVE_LEVELS } from './subtraction.js';
 import { Viewer } from './viewer.js';
 import { initToolbar, labelButton } from './toolbar.js';
+import { initWakeLock } from './wake-lock.js';
+
+initWakeLock();
 
 const INITIAL_FORMS = 3;
 

@@ -8,22 +8,13 @@ import { chainSegments, edgeKey, weldPositions } from './geomutil.js';
 
 const evaluator = new Evaluator();
 evaluator.attributes = [ 'position' ];
-evaluator.useGroups = true;
-// Both must stay off: consolidation would merge A's and B's groups (they share
-// a material type) and material pruning would renumber them.
-evaluator.consolidateGroups = false;
-evaluator.removeUnusedMaterials = false;
+evaluator.useGroups = false;
 
 const MATERIAL_A = new MeshBasicMaterial();
-const MATERIAL_B = new MeshBasicMaterial();
 
 /**
- * A second evaluator, for carving. Its settings are deliberately the opposite
- * of the one above, because it is doing the opposite kind of job: there the
- * result is a scaffold read for its tagging and thrown away, here the result
- * *is* the form that gets drawn. So groups are off — the carved solid is one
- * mesh with one material — and normals are carried through the boolean, which
- * is what keeps the wall of a bored cylinder smooth instead of faceted.
+ * Carving retains the boolean result for rendering, so it also carries
+ * normals through the operation to keep curved walls smooth.
  */
 const carver = new Evaluator();
 carver.attributes = [ 'position', 'normal' ];
@@ -82,9 +73,6 @@ export function meshVolume( geometry ) {
  */
 export function intersectionCurves( brushA, brushB, eps = 1e-5 ) {
 
-	brushA.material = MATERIAL_A;
-	brushB.material = MATERIAL_B;
-
 	let result;
 	try {
 
@@ -99,7 +87,12 @@ export function intersectionCurves( brushA, brushB, eps = 1e-5 ) {
 
 	const geometry = result.geometry;
 	const position = geometry.getAttribute( 'position' );
-	if ( ! position || position.count === 0 ) return null;
+	if ( ! position || position.count === 0 ) {
+
+		geometry.dispose();
+		return null;
+
+	}
 
 	const volume = meshVolume( geometry );
 	geometry.dispose();

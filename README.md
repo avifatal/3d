@@ -50,17 +50,14 @@ Drag to orbit, scroll to zoom, right-drag or two fingers to pan.
 
 ### Intersection curves
 
-A boolean `A ∩ B` produces a solid whose surface is two patches: triangles carved from
-A's surface and triangles carved from B's. The curve where the originals meet is exactly
-the border between those patches. So rather than guessing which result edges are seams,
-`src/intersections.js` tags every result triangle with its source brush (via material
-groups, with group consolidation switched off so the two sources stay distinguishable)
-and takes the boundary of the A-patch — the edges used by exactly one A-triangle.
+`src/intersections.js` intersects triangles from the two original surfaces, using
+their bounding-volume trees to find candidate pairs. The resulting segments are
+welded, deduplicated, and walked into ordered polylines. Even short seam branches
+are retained. Extracting borders from boolean-clipped triangles instead can introduce
+false branches and gaps when neighbouring triangles are split differently.
 
-That boundary is then walked into ordered polylines. CSG output is not a tidy set of
-disjoint loops: coincident-face cases leave T-junctions and micro-fragments, so the
-walker picks the most direction-preserving continuation at a junction and fragments
-under 6% of the longest branch are discarded as noise.
+A boolean `A ∩ B` is still computed to measure the overlapping volume for placement.
+Coplanar contact and single-point tangencies do not contribute crossing segments.
 
 A box driven through another box yields two separate loops — entry and exit — which is
 exactly what you want to see when learning where a form enters and leaves another.
@@ -310,7 +307,7 @@ once; a merely-valid placement is only accepted once the good ones have had thei
 
 ```
 src/geomutil.js      vertex welding, polyline chaining
-src/intersections.js CSG intersection curve extraction
+src/intersections.js surface intersection curves and CSG volume measurement
 src/silhouette.js    hard edges + view-dependent contours
 src/shapes.js        the forms and their construction guides
 src/placement.js     surface sampling and validated placement
