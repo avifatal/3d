@@ -45,7 +45,6 @@ try {
   await page.click( '[data-theme="blueprint"]' );
   assert.equal( await page.$eval( 'html', el => el.dataset.theme ), 'blueprint' );
   await page.click( '[data-theme="paper"]' );
-  await page.click( '[data-tab="objects"]' );
   const id = await page.evaluate( () => String( window.__app.scene.forms[0].id ) );
   await page.select( '#selectedObject', id );
   await page.click( '#hideSelected' );

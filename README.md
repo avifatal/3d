@@ -1,5 +1,12 @@
 # Perspective Forms
 
+Select an object on the canvas or in the top toolbar, then choose **Move** (W) or
+**Rotate** (R). Drag the colored 3D handles; V returns to selection. Rotation
+uses the object's centre. **Undo transform** (Ctrl/⌘ Z) restores previous edits, and Esc
+cancels the current drag. Moving a solid updates its intersection curves when
+released; outlines, construction guides, and shadows follow the object.
+
+
 An interactive 3D reference for perspective drawing practice. Five exercises share one
 renderer and one set of drawing controls:
 

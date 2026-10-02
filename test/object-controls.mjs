@@ -16,7 +16,6 @@ try {
   await page.click( '[data-tab="create"]' );
   await page.click( `[data-exercise="${exercise}"]` );
   await page.waitForFunction( () => ! document.querySelector( '#add' ).disabled );
-  await page.click( '[data-tab="objects"]' );
   const before = await page.evaluate( () => window.__app.scene.forms.length );
   const id = await page.evaluate( () => String( window.__app.scene.forms[ 0 ].id ) );
   await page.select( '#selectedObject', id );

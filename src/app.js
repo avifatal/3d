@@ -165,6 +165,8 @@ export class FormScene {
 		const form = {
 			id: this.nextId ++,
 			shapeId,
+			construction,
+			openSurface,
 			label: name,
 			geometry,
 			brush: openSurface ? null : makeBrush( geometry ),
@@ -215,6 +217,19 @@ export class FormScene {
 
 		this.forms.push( form );
 
+		this.addIntersections( form, pairs );
+
+		this.applyMode();
+		this.viewer.lastEye.set( Infinity, 0, 0 );
+
+		this.onChange();
+		return form;
+
+	}
+
+	addIntersections( form, pairs ) {
+
+		const scene = this.viewer.scene;
 		for ( const pair of pairs ) {
 
 			const curve = new CurveLines(
@@ -230,12 +245,6 @@ export class FormScene {
 
 		}
 
-		this.applyMode();
-		this.viewer.lastEye.set( Infinity, 0, 0 );
-
-		this.onChange();
-		return form;
-
 	}
 
 	/**
@@ -245,13 +254,13 @@ export class FormScene {
 	 * below rejects every pair before any CSG runs — and if one ever did
 	 * overlap, the curve would show up and make the fault visible.
 	 */
-	intersectAgainstScene( brush, volume, box ) {
+	intersectAgainstScene( brush, volume, box, skip = null ) {
 
 		const pairs = [];
 
 		for ( const other of this.forms ) {
 
-			if ( ! other.brush || ! other.box.intersectsBox( box ) ) continue;
+			if ( other === skip || ! other.brush || ! other.box.intersectsBox( box ) ) continue;
 			if ( overlapDepth( box, other.box ) < CONTACT_EPSILON ) continue;
 
 			const result = intersectionCurves( brush, other.brush );
@@ -479,14 +488,90 @@ export class FormScene {
 		const form = this.carveForm;
 		if ( ! form || this.forms[ 0 ] !== form || ! this.carveGhost ) return;
 
+		form.construction = ghostLines( this.carveGhost, guides );
 		form.constructionLines.dispose();
 		form.constructionLines = new CurveLines(
-			ghostLines( this.carveGhost, guides ),
+			form.construction,
 			this.viewer.materials.construction,
 			this.viewer.materials.constructionHidden,
 		).addTo( this.viewer.scene );
 		form.constructionLines.setVisible( this.showConstruction );
 		this.applyMode();
+
+	}
+
+	/** Preview a rigid transform without rebuilding geometry or running CSG. */
+	previewTransform( form, matrix = null ) {
+
+		if ( ! this.forms.includes( form ) ) return;
+		form.previewMatrix = matrix?.clone() ?? null;
+		const objects = [ form.mesh, form.hardLines.visible, form.hardLines.hidden,
+			form.contourLines.visible, form.contourLines.hidden, ...form.constructionLines.objects ];
+		for ( const object of objects ) {
+
+			object.matrixAutoUpdate = ! matrix;
+			if ( matrix ) object.matrix.copy( matrix );
+			else object.matrix.identity();
+			object.matrixWorldNeedsUpdate = true;
+
+		}
+		for ( const entry of this.intersections ) {
+
+			if ( entry.a === form || entry.b === form ) entry.curve.setVisible( ! matrix && this.showIntersections );
+
+		}
+		if ( ! matrix ) this.applyMode();
+		this.viewer.lastEye.set( Infinity, 0, 0 );
+
+	}
+
+	/** Bake a completed move/rotation and rebuild only affected intersections. */
+	transformForm( form, matrix ) {
+
+		if ( ! this.forms.includes( form ) ) return false;
+		this.previewTransform( form );
+		const previous = form.geometry;
+		form.geometry = previous.clone().applyMatrix4( matrix );
+		form.mesh.geometry = form.geometry;
+		previous.dispose();
+		form.box.setFromBufferAttribute( form.geometry.getAttribute( 'position' ) );
+		form.brush = form.openSurface ? null : makeBrush( form.geometry );
+		form.sampler = form.openSurface ? null : buildSurfaceSampler( form.geometry );
+		form.construction = form.construction.map( points => transformPolyline( points, matrix ) );
+		if ( this.carveForm === form && this.carveGhost ) {
+
+			for ( const key of [ 'solid', 'cuts' ] ) this.carveGhost[ key ] = this.carveGhost[ key ].map( points => transformPolyline( points, matrix ) );
+
+		}
+		const data = form.edgeData;
+		data.hardSegments = transformPolyline( data.hardSegments, matrix );
+		data.triPositions = transformPolyline( data.triPositions, matrix );
+		const normal = new Vector3();
+		for ( let i = 0; i < data.triNormals.length; i += 3 ) {
+
+			normal.fromArray( data.triNormals, i ).transformDirection( matrix ).toArray( data.triNormals, i );
+
+		}
+		form.hardLines.setSegments( data.hardSegments, data.hardSegments.length / 6 );
+		form.constructionLines.dispose();
+		form.constructionLines = new CurveLines( form.construction,
+			this.viewer.materials.construction, this.viewer.materials.constructionHidden ).addTo( this.viewer.scene );
+		form.constructionLines.setVisible( this.showConstruction );
+		this.intersections = this.intersections.filter( entry => {
+
+			if ( entry.a !== form && entry.b !== form ) return true;
+			entry.curve.dispose();
+			entry.a.links --;
+			entry.b.links --;
+			return false;
+
+		} );
+		if ( form.brush ) this.addIntersections( form, this.intersectAgainstScene( form.brush, form.volume, form.box, form ) );
+		this.applyMode();
+		this.refreshGround();
+		this.viewer.lastEye.set( Infinity, 0, 0 );
+		this.onChange();
+		return true;
 
 	}
 
@@ -604,7 +689,8 @@ export class FormScene {
 		for ( const form of this.forms ) {
 
 			const buffer = form.contourLines.buffer;
-			const count = extractContour( form.edgeData, eye.x, eye.y, eye.z, buffer );
+			const localEye = form.previewMatrix ? eye.clone().applyMatrix4( form.previewMatrix.clone().invert() ) : eye;
+			const count = extractContour( form.edgeData, localEye.x, localEye.y, localEye.z, buffer );
 			form.contourLines.setSegments( buffer, count );
 
 		}
@@ -649,7 +735,9 @@ export class FormScene {
 		for ( const entry of this.intersections ) {
 
 			this.setLinesFaint( entry.curve, entry.a.faint || entry.b.faint );
-			entry.curve.setHiddenVisible( showHidden && this.showIntersections );
+			const visible = this.showIntersections && !entry.a.previewMatrix && !entry.b.previewMatrix;
+			entry.curve.setVisible( visible );
+			entry.curve.setHiddenVisible( showHidden && visible );
 
 		}
 

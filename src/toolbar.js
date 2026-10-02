@@ -1,5 +1,7 @@
 // Small, local SVG set: no icon font or network dependency.
 const paths = {
+ move: '<path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
+ rotate: '<path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/>',
  cube: '<path d="m12 3 9 5v8l-9 5-9-5V8Z M3 8l9 5 9-5 M12 13v8"/>',
  intersect: '<rect x="3" y="3" width="12" height="12" rx="2"/><rect x="9" y="9" width="12" height="12" rx="2"/>',
  stack: '<path d="m12 3 9 5-9 5-9-5Z M3 12l9 5 9-5 M3 16l9 5 9-5"/>',

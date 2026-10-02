@@ -1,4 +1,5 @@
 import { Box3, Box3Helper, Raycaster, Vector2 } from 'three';
+import { ObjectEditor } from './object-editor.js';
 import { FormScene } from './app.js';
 import { rememberPanel, restorePanel } from './prefs.js';
 import { ARRANGEMENTS, LEVELS as QUEUE_LEVELS, SHAPE_IDS as QUEUE_SHAPE_IDS } from './queueing.js';
@@ -472,6 +473,16 @@ selectionBox.renderOrder = 3;
 selectionBox.visible = false;
 viewer.scene.add( selectionBox );
 
+const editor = new ObjectEditor( viewer, scene,
+	box => selectionBox.box.copy( box ), () => report( 'object transformed' ) );
+$( 'transformMode' ).addEventListener( 'click', event => {
+
+	const button = event.target.closest( '[data-transform]' );
+	if ( button ) editor.setMode( button.dataset.transform );
+
+} );
+$( 'undoTransform' ).addEventListener( 'click', () => editor.undo() );
+
 scene.onChange = () => {
 
 	objectSelect.replaceChildren( new Option( 'Select an object…', '' ) );
@@ -487,6 +498,7 @@ scene.onChange = () => {
 	$( 'hideSelected' ).setAttribute( 'aria-pressed', String( !! scene.selected?.faint ) );
 	selectionBox.visible = !! scene.selected && ! scene.selected.faint;
 	if ( scene.selected ) selectionBox.box.copy( scene.selected.box );
+	editor.sync();
 
 };
 
@@ -520,7 +532,7 @@ const pointers = new Set();
 canvas.addEventListener( 'pointerdown', event => {
 
 	pointers.add( event.pointerId );
-	press = pointers.size === 1 && event.button === 0
+	press = ! editor.gesture && pointers.size === 1 && event.button === 0
 		? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
 
 } );
@@ -540,7 +552,7 @@ canvas.addEventListener( 'pointerup', event => {
 	pointers.delete( event.pointerId );
 	const click = press;
 	press = null;
-	if ( ! click || click.id !== event.pointerId ) return;
+	if ( editor.gesture || ! click || click.id !== event.pointerId ) return;
 	const rect = canvas.getBoundingClientRect();
 	raycaster.setFromCamera( new Vector2(
 		( event.clientX - rect.left ) / rect.width * 2 - 1,
@@ -718,7 +730,10 @@ const SHORTCUTS = {
 	delete: deleteSelected,
 	backspace: deleteSelected,
 	h: toggleSelected,
-	escape: () => scene.select( null ),
+	escape: () => { if ( !editor.cancel() ) scene.select( null ); },
+	v: () => editor.setMode( 'select' ),
+	w: () => editor.setMode( 'translate' ),
+	r: () => editor.setMode( 'rotate' ),
 	f: () => scene.frame(),
 	x: () => $( 'mode' ).querySelector( 'button:not(.active)' ).click(),
 	1: () => setLevelHere( 0 ),
@@ -728,9 +743,17 @@ const SHORTCUTS = {
 
 window.addEventListener( 'keydown', event => {
 
-	if ( event.metaKey || event.ctrlKey || event.altKey ) return;
 	if ( event.target.matches( 'input, select, textarea, [contenteditable="true"]' ) ) return;
+	if ( ( event.metaKey || event.ctrlKey ) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'z' ) {
 
+		event.preventDefault();
+		editor.undo();
+		return;
+
+	}
+	if ( event.metaKey || event.ctrlKey || event.altKey ) return;
+
+	if ( editor.start && event.key !== 'Escape' ) return;
 	const action = SHORTCUTS[ event.key.toLowerCase() ];
 	if ( ! action ) return;
 
@@ -761,4 +784,4 @@ describeQueue();
 setExercise( $( 'exercise' ).querySelector( 'button.active' ).dataset.exercise );
 
 // Handle for tools/shot.mjs, which drives the page to verify rendering.
-window.__app = { viewer, scene };
+window.__app = { viewer, scene, editor };

@@ -16,15 +16,36 @@
 		<button id="toggleHelp" data-icon="help" aria-label="Show control hints" aria-pressed="false" title="Show control hints">Help</button>
 		<button id="togglePanel" data-icon="chevron" aria-label="Expand tools" aria-expanded="false" aria-controls="toolContent" title="Expand tools">Expand tools</button>
 	</header>
+	<div class="viewport-tools" aria-label="Scene toolbar">
+	<div id="objectsTools" class="object-toolbar" aria-label="Object tools">
+	<section>
+		<label class="sr-only" for="selectedObject">Selected object</label>
+		<div class="row"><select id="selectedObject"><option value="">Select an object…</option></select></div>
+		<div class="segmented transform-tools" id="transformMode" role="group" aria-label="Object tool">
+			<button data-transform="select" data-icon="select" class="active with-label" title="Select (V)">Select</button>
+			<button data-transform="translate" data-icon="move" class="with-label" title="Move (W)" disabled>Move</button>
+			<button data-transform="rotate" data-icon="rotate" class="with-label" title="Rotate (R)" disabled>Rotate</button>
+		</div>
+		<p class="transform-help">Select an object, then drag the colored arrows to move or rings to rotate. V select · W move · R rotate · Esc cancel.</p>
+		<button id="undoTransform" title="Undo transform (Ctrl/⌘ Z)" data-icon="undo" class="with-label" disabled>Undo transform</button>
+		<p class="note">Click an object or choose it above. Hide leaves a 10% outline; Show restores it. Delete key deletes · H hides/shows · Esc deselects.</p>
+		<div class="row wrap object-actions">
+			<button id="hideSelected" title="Hide selected object (H)" disabled>Hide</button>
+			<button id="deleteSelected" title="Delete selected object" disabled>Delete</button>
+		</div>
+		<div class="row wrap"><button id="clear" data-icon="clear" class="with-label" title="Remove all objects">Clear scene</button></div>
+	</section>
+
+	</div>
 	<div class="quick-tools" aria-label="Camera and scene actions">
 		<button id="fit" data-icon="fit" title="Fit view (F)">Fit view</button>
 		<button id="lockCamera" data-icon="lock" class="camera-lock" aria-pressed="false" title="Lock camera angle; zoom and pan stay available">Lock camera</button>
 		<button id="undo" data-icon="undo" title="Undo last object (Z)">Undo</button>
 		<button id="newScene" data-icon="refresh" title="Generate a new scene (N)">New scene</button>
 	</div>
+	</div>
 	<nav class="tool-tabs" aria-label="Tool categories">
 		<button data-tab="create" data-icon="cube" aria-controls="createTools" aria-pressed="true" class="with-label">Create</button>
-		<button data-tab="objects" data-icon="select" aria-controls="objectsTools" aria-pressed="false" class="with-label">Objects</button>
 		<button data-tab="style" data-icon="sliders" aria-controls="styleTools" aria-pressed="false" class="with-label">Style</button>
 	</nav>
 	<div id="toolContent">
@@ -118,19 +139,6 @@
 		<div class="row wrap generation-action">
 			<button id="recarve" class="primary">New form</button>
 		</div>
-	</section>
-
-	</div>
-	<div id="objectsTools" class="tool-page" aria-label="Object tools" hidden>
-	<section>
-		<label class="field" for="selectedObject">Selected object</label>
-		<div class="row"><select id="selectedObject"><option value="">Select an object…</option></select></div>
-		<p class="note">Click an object or choose it above. Hide leaves a 10% outline; Show restores it. Delete key deletes · H hides/shows · Esc deselects.</p>
-		<div class="row wrap object-actions">
-			<button id="hideSelected" disabled>Hide</button>
-			<button id="deleteSelected" disabled>Delete</button>
-		</div>
-		<div class="row wrap"><button id="clear" data-icon="clear" class="with-label" title="Remove all objects">Clear scene</button></div>
 	</section>
 
 	</div>
