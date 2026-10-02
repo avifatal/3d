@@ -1,4 +1,5 @@
-import { Matrix4, Object3D, Vector3 } from 'three';
+import { Matrix4, Object3D } from 'three';
+import { objectCenter } from './object-bounds.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 export class ObjectEditor {
@@ -52,7 +53,7 @@ export class ObjectEditor {
   if ( this.start ) return;
   if ( !form || form.faint || this.mode === 'select' ) this.controls.detach();
   else {
-   form.box.getCenter( this.proxy.position );
+   objectCenter( form, this.proxy.position );
    this.proxy.quaternion.identity();
    this.proxy.updateMatrixWorld( true );
    this.controls.attach( this.proxy );
@@ -69,7 +70,7 @@ export class ObjectEditor {
   const rotate = this.viewer.controls.enableRotate;
   this.viewer.setCameraLocked( true );
   this.viewer.controls.enableRotate = rotate;
-  this.start = new Matrix4().makeTranslation( ...this.form.box.getCenter( new Vector3() ).toArray() );
+  this.start = new Matrix4().makeTranslation( ...objectCenter( this.form ).toArray() );
  }
  delta() {
   this.proxy.updateMatrix();
@@ -79,7 +80,7 @@ export class ObjectEditor {
   if ( !this.start ) return;
   const delta = this.delta();
   this.scene.previewTransform( this.form, delta );
-  this.onPreview( this.form.box.clone().applyMatrix4( delta ) );
+  this.onPreview( this.form );
  }
  finish() {
   if ( !this.start ) return;
@@ -101,7 +102,7 @@ export class ObjectEditor {
   this.controls.dragging = false;
   this.controls.axis = null;
   this.scene.previewTransform( this.form );
-  this.onPreview( this.form.box );
+  this.onPreview( this.form );
   this.viewer.controls.enabled = this.orbitEnabled ?? true;
   this.sync();
   return true;

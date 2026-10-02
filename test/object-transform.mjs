@@ -13,7 +13,7 @@ try {
  await page.waitForFunction( () => window.__app?.scene.forms.length && !document.querySelector('#add').disabled );
  await page.click( '[data-exercise="ribbon"]' );
  await page.waitForFunction( () => !document.querySelector('#add').disabled );
- await page.select( '#selectedObject', await page.evaluate( () => String(window.__app.scene.forms[0].id) ) );
+ await page.evaluate( () => { const { scene } = window.__app; scene.select( scene.forms[ 0 ] ); } );
  await page.click( '[data-transform="translate"]' );
  await page.evaluate( () => { const v=window.__app.viewer; v.controls.enableDamping=false; v.tick(); } );
  const snapshot = () => page.evaluate( () => {
@@ -36,6 +36,10 @@ try {
  await page.mouse.move(handle.x+55,handle.y+10,{steps:8});
  await page.mouse.up();
  const moved=await snapshot();
+ assert.equal( await page.evaluate( () => {
+  const {scene,viewer}=window.__app;
+  return viewer.scene.getObjectByName('selectionBounds').matrix.equals(scene.selected.objectBounds.matrix);
+ } ), true, 'selection cage follows committed move' );
  assert.notDeepEqual(moved.points,before.points,'drag moves geometry');
  assert.deepEqual(moved.camera,before.camera,'drag does not orbit camera');
  assert.equal(moved.id,before.id,'identity and selection survive');
@@ -58,7 +62,13 @@ try {
  } );
  await page.mouse.move(ring.x,ring.y); await page.mouse.down();
  assert.equal(await page.evaluate(()=>!!window.__app.editor.start),true,'rotation ring starts drag');
- await page.mouse.move(ring.x+35,ring.y+30,{steps:8}); await page.mouse.up();
+ await page.mouse.move(ring.x+35,ring.y+30,{steps:8});
+ assert.equal( await page.evaluate( () => {
+  const {scene,viewer}=window.__app;
+  const form=scene.selected;
+  return viewer.scene.getObjectByName('selectionBounds').matrix.equals(form.objectBounds.matrix.clone().premultiply(form.previewMatrix));
+ } ), true, 'selection cage rotates with the preview without becoming a world box' );
+ await page.mouse.up();
  assert.notDeepEqual((await snapshot()).points,before.points,'rotation changes geometry');
  await page.click('#undoTransform');
  undone=await snapshot();
@@ -110,7 +120,7 @@ try {
  await page.click('[data-tab="create"]');
  await page.click('[data-exercise="ribbon"]');
  await page.waitForFunction(()=>!document.querySelector('#add').disabled);
- await page.select('#selectedObject',await page.evaluate(()=>String(window.__app.scene.forms[0].id)));
+ await page.evaluate( () => { const { scene } = window.__app; scene.select( scene.forms[ 0 ] ); } );
  await page.click('[data-transform="translate"]');
  const touchHandle=async()=>page.evaluate(()=>{
   const {editor,viewer}=window.__app;viewer.controls.enableDamping=false;viewer.tick();

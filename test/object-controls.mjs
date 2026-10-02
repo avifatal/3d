@@ -17,8 +17,20 @@ try {
   await page.click( `[data-exercise="${exercise}"]` );
   await page.waitForFunction( () => ! document.querySelector( '#add' ).disabled );
   const before = await page.evaluate( () => window.__app.scene.forms.length );
-  const id = await page.evaluate( () => String( window.__app.scene.forms[ 0 ].id ) );
-  await page.select( '#selectedObject', id );
+ await page.evaluate( () => { const { scene } = window.__app; scene.select( scene.forms[ 0 ] ); } );
+  assert.equal( await page.evaluate( () => {
+   const { scene, viewer } = window.__app;
+   const frame = viewer.scene.getObjectByName( 'selectionBounds' );
+   viewer.tick();
+   const bounds = scene.selected.objectBounds;
+   if ( !frame.matrix.equals( bounds.matrix ) ) return false;
+   const actual = bounds.box.clone().makeEmpty();
+   const inverse = bounds.matrix.clone().invert();
+   const point = viewer.camera.position.clone();
+   const positions = scene.selected.geometry.attributes.position;
+   for ( let i=0; i<positions.count; i++ ) actual.expandByPoint( point.fromBufferAttribute(positions,i).applyMatrix4(inverse) );
+   return actual.min.distanceTo(bounds.box.min)<2e-5 && actual.max.distanceTo(bounds.box.max)<2e-5;
+  } ), true, `${exercise}: object-aligned cage touches all six bounds` );
   await page.click( '#hideSelected' );
   assert.equal( await page.evaluate( () => {
    const { scene } = window.__app;

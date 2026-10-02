@@ -143,11 +143,9 @@ html[data-tools-collapsed="true"] { --sidebar-width: 64px; }
  background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 8px;
  box-shadow: 0 3px 12px #0000000a; padding: 4px; max-width: 100%;
 }
-.object-toolbar { flex: 1 1 520px; overflow-x: auto; scrollbar-width: thin; }
+.object-toolbar { flex: 0 1 auto; overflow-x: auto; scrollbar-width: thin; }
 .object-toolbar section { display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; border: 0; width: max-content; min-width: 100%; }
 .object-toolbar section .row, .object-toolbar .object-actions { flex-wrap: nowrap; margin: 0; gap: 3px; }
-.object-toolbar .row:first-of-type { flex: 1; }
-.object-toolbar #selectedObject { width: 145px; min-width: 110px; max-width: 180px; }
 .object-toolbar .segmented { margin: 0; padding: 0; gap: 2px; border: 0; background: transparent; }
 .viewport-tools button, .viewport-tools select { min-height: 30px; height: 30px; min-width: 30px; padding: 4px 6px; gap: 4px; font-size: 11px; border-radius: 5px; }
 .viewport-tools button svg { width: 15px; height: 15px; }
@@ -163,10 +161,12 @@ html[data-tools-collapsed="true"] { --sidebar-width: 64px; }
  .object-toolbar { flex-basis: 100%; }
  .viewport-tools button { min-height: 36px; height: 36px; min-width: 36px; }
  .viewport-tools select { font-size: 16px; height: 36px; }
- .object-toolbar #selectedObject { width: 126px; }
  .object-toolbar [data-transform] .button-label { display: none; }
 }
 @media (max-width: 940px) and (max-height: 500px) and (orientation: landscape) {
  .viewport-tools { left: calc(var(--sidebar-width) + 8px); }
  .viewport-tools .quick-tools button { min-height: 30px; height: 30px; }
 }
+
+#togglePerspective .button-label { display: none; }
+#togglePerspective[aria-pressed="true"] { color: var(--accent); background: var(--hover); }

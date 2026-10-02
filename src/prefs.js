@@ -29,7 +29,7 @@ const SEGMENTED = {
 
 const SELECTS = [ 'shape', 'queueShape' ];
 const RANGES = [ 'shading', 'shadow', 'azimuth', 'elevation', 'curveWeight' ];
-const CHECKS = [ 'showIntersections', 'showConstruction', 'showGrid', 'showHorizon' ];
+const CHECKS = [ 'showIntersections', 'showConstruction', 'showPerspective', 'showGrid', 'showHorizon' ];
 
 const $ = id => document.getElementById( id );
 

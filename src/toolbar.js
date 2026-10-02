@@ -1,5 +1,6 @@
 // Small, local SVG set: no icon font or network dependency.
 const paths = {
+ perspective: '<path d="m3 6 16 6L3 18M3 10l16 2-16 2m13-5 3 3-3 3"/>',
  move: '<path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
  rotate: '<path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/>',
  cube: '<path d="m12 3 9 5v8l-9 5-9-5V8Z M3 8l9 5 9-5 M12 13v8"/>',

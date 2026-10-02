@@ -102,6 +102,6 @@ export function generateRibbon( levelId = 'easier', rng = Math.random ) {
 	geometry.setIndex( indices );
 	geometry.computeVertexNormals();
 	geometry.computeBoundingSphere();
-	return { geometry, construction, bends, width, segments, acrossSegments };
+	return { geometry, construction, bends, width, segments, acrossSegments, frame: rotation };
 
 }

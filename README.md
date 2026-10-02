@@ -1,8 +1,12 @@
 # Perspective Forms
 
-Select an object on the canvas or in the top toolbar, then choose **Move** (W) or
+Click or tap an object on the canvas, then choose **Move** (W) or
 **Rotate** (R). Drag the colored 3D handles; V returns to selection. Rotation
-uses the object's centre. **Undo transform** (Ctrl/⌘ Z) restores previous edits, and Esc
+uses the object's centre. Selection boxes fit the object in its own axes and
+follow its orientation across every exercise.
+**Perspective lines** extends the selected box’s parallel edges away from the
+camera, with arrowheads. Toggle it in the top toolbar or **Style → Show**; the
+setting is remembered. Guides update while orbiting or transforming an object. **Undo transform** (Ctrl/⌘ Z) restores previous edits, and Esc
 cancels the current drag. Moving a solid updates its intersection curves when
 released; outlines, construction guides, and shadows follow the object.
 

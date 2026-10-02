@@ -1,4 +1,5 @@
-import { Box3, Box3Helper, Raycaster, Vector2 } from 'three';
+import { Box3, Box3Helper, Group, Raycaster, Vector2 } from 'three';
+import { PerspectiveGuides } from './perspective-guides.js';
 import { ObjectEditor } from './object-editor.js';
 import { FormScene } from './app.js';
 import { rememberPanel, restorePanel } from './prefs.js';
@@ -19,6 +20,8 @@ const $ = id => document.getElementById( id );
 
 const viewer = new Viewer( $( 'stage' ) );
 const scene = new FormScene( viewer );
+const perspectiveGuides = new PerspectiveGuides( viewer, scene );
+viewer.onRender( () => perspectiveGuides.update() );
 initToolbar( viewer );
 
 const shapeSelect = $( 'shape' );
@@ -463,7 +466,6 @@ $( 'reribbon' ).addEventListener( 'click', () => withBusyState( () => { ribbon()
 
 // --- object selection ------------------------------------------------------
 
-const objectSelect = $( 'selectedObject' );
 const selectionBox = new Box3Helper( new Box3(), 0xc23b17 );
 selectionBox.material.depthTest = false;
 selectionBox.material.transparent = true;
@@ -471,10 +473,23 @@ selectionBox.material.opacity = 0.55;
 selectionBox.material.depthWrite = false;
 selectionBox.renderOrder = 3;
 selectionBox.visible = false;
-viewer.scene.add( selectionBox );
+const selectionFrame = new Group();
+selectionFrame.name = 'selectionBounds';
+selectionFrame.matrixAutoUpdate = false;
+selectionFrame.add( selectionBox );
+viewer.scene.add( selectionFrame );
+
+function updateSelectionBox( form ) {
+
+	selectionBox.box.copy( form.objectBounds.box );
+	selectionFrame.matrix.copy( form.objectBounds.matrix );
+	if ( form.previewMatrix ) selectionFrame.matrix.premultiply( form.previewMatrix );
+	selectionFrame.matrixWorldNeedsUpdate = true;
+
+}
 
 const editor = new ObjectEditor( viewer, scene,
-	box => selectionBox.box.copy( box ), () => report( 'object transformed' ) );
+	updateSelectionBox, () => report( 'object transformed' ) );
 $( 'transformMode' ).addEventListener( 'click', event => {
 
 	const button = event.target.closest( '[data-transform]' );
@@ -485,28 +500,15 @@ $( 'undoTransform' ).addEventListener( 'click', () => editor.undo() );
 
 scene.onChange = () => {
 
-	objectSelect.replaceChildren( new Option( 'Select an object…', '' ) );
-	for ( const form of scene.forms ) {
-
-		objectSelect.add( new Option( `${form.label} #${form.id}${form.faint ? ' (hidden)' : ''}`, String( form.id ) ) );
-
-	}
-	objectSelect.value = scene.selected ? String( scene.selected.id ) : '';
 	$( 'deleteSelected' ).disabled = ! scene.selected;
 	$( 'hideSelected' ).disabled = ! scene.selected;
 	labelButton( $( 'hideSelected' ), scene.selected?.faint ? 'Show object (H)' : 'Hide object (H)', scene.selected?.faint ? 'eye' : 'eyeOff' );
 	$( 'hideSelected' ).setAttribute( 'aria-pressed', String( !! scene.selected?.faint ) );
 	selectionBox.visible = !! scene.selected && ! scene.selected.faint;
-	if ( scene.selected ) selectionBox.box.copy( scene.selected.box );
+	if ( scene.selected ) updateSelectionBox( scene.selected );
 	editor.sync();
 
 };
-
-objectSelect.addEventListener( 'change', () => {
-
-	scene.select( scene.forms.find( form => String( form.id ) === objectSelect.value ) );
-
-} );
 
 function deleteSelected() {
 
@@ -676,6 +678,20 @@ function showConstructionGuides( value ) {
 
 bindCheck( 'showIntersections', value => scene.setIntersectionsVisible( value ) );
 bindCheck( 'showConstruction', value => scene.setConstructionVisible( value ) );
+bindCheck( 'showPerspective', value => {
+
+	perspectiveGuides.enabled = value;
+	$( 'togglePerspective' ).setAttribute( 'aria-pressed', String( value ) );
+	perspectiveGuides.update();
+
+} );
+$( 'togglePerspective' ).addEventListener( 'click', () => {
+
+	const input = $( 'showPerspective' );
+	input.checked = !input.checked;
+	input.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+
+} );
 bindCheck( 'showGrid', value => viewer.setGridVisible( value ) );
 bindCheck( 'showHorizon', value => viewer.setHorizonVisible( value ) );
 
@@ -784,4 +800,4 @@ describeQueue();
 setExercise( $( 'exercise' ).querySelector( 'button.active' ).dataset.exercise );
 
 // Handle for tools/shot.mjs, which drives the page to verify rendering.
-window.__app = { viewer, scene, editor };
+window.__app = { viewer, scene, editor, perspectiveGuides };

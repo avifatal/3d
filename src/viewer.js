@@ -118,6 +118,7 @@ export class Viewer {
 		this.setLightAngle( this.azimuth, this.elevation );
 
 		this.frameCallbacks = [];
+		this.renderCallbacks = [];
 		this.lastEye = new Vector3( Infinity, 0, 0 );
 
 		this.onResize = this.onResize.bind( this );
@@ -323,6 +324,13 @@ export class Viewer {
 
 	}
 
+	/** Lightweight overlays that also depend on orientation and live edits. */
+	onRender( callback ) {
+
+		this.renderCallbacks.push( callback );
+
+	}
+
 	onResize() {
 
 		const { clientWidth: width, clientHeight: height } = this.container;
@@ -368,6 +376,7 @@ export class Viewer {
 			faint.opacity = material.opacity * 0.10;
 
 		}
+		for ( const callback of this.renderCallbacks ) callback();
 		this.renderer.render( this.scene, this.camera );
 
 	}

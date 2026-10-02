@@ -45,8 +45,7 @@ try {
   await page.click( '[data-theme="blueprint"]' );
   assert.equal( await page.$eval( 'html', el => el.dataset.theme ), 'blueprint' );
   await page.click( '[data-theme="paper"]' );
-  const id = await page.evaluate( () => String( window.__app.scene.forms[0].id ) );
-  await page.select( '#selectedObject', id );
+ await page.evaluate( () => { const { scene } = window.__app; scene.select( scene.forms[ 0 ] ); } );
   await page.click( '#hideSelected' );
   assert.equal( await page.$eval( '#hideSelected', el => el.getAttribute( 'aria-label' ) ), 'Show object (H)' );
   assert.equal( await page.$eval( '#hideSelected', el => !!el.querySelector('svg') ), true );

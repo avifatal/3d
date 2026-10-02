@@ -8,6 +8,7 @@ import { buildSurfaceSampler, findPlacement } from './placement.js';
 import { createShape, SHAPES } from './shapes.js';
 import { buildEdgeData, extractContour, maxContourSegments } from './silhouette.js';
 import { generateQueue, SHAPE_IDS as QUEUE_SHAPE_IDS, THIN_AXIS } from './queueing.js';
+import { objectBounds } from './object-bounds.js';
 import { generateRibbon } from './ribbon.js';
 import { generateStacking } from './stacking.js';
 import { generateSubtraction } from './subtraction.js';
@@ -157,7 +158,7 @@ export class FormScene {
 	 * curves where it meets what is already there. Both exercises come
 	 * through here; they differ only in how the geometry was positioned.
 	 */
-	createForm( { geometry, construction = [], shapeId, label: name, radius, pairs, openSurface = false } ) {
+	createForm( { geometry, construction = [], shapeId, label: name, radius, pairs, openSurface = false, frame = new Matrix4() } ) {
 
 		const { scene } = this.viewer;
 		const edgeData = buildEdgeData( geometry, 18, openSurface );
@@ -167,6 +168,7 @@ export class FormScene {
 			shapeId,
 			construction,
 			openSurface,
+			objectBounds: objectBounds( geometry, frame ),
 			label: name,
 			geometry,
 			brush: openSurface ? null : makeBrush( geometry ),
@@ -294,6 +296,7 @@ export class FormScene {
 
 		const form = this.createForm( {
 			geometry: placement.geometry,
+			frame: placement.matrix,
 			construction: shape.construction.map( points => transformPolyline( points, placement.matrix ) ),
 			shapeId,
 			label: label( shapeId ),
@@ -333,6 +336,7 @@ export class FormScene {
 
 			this.createForm( {
 				geometry,
+				frame: matrix,
 				construction: boxConstruction( box, matrix ),
 				shapeId: 'box',
 				label: box.kind === 'leaner' ? 'Leaning box' : 'Box',
@@ -396,6 +400,7 @@ export class FormScene {
 
 			this.createForm( {
 				geometry,
+				frame: matrix,
 				construction: construction.map( points => transformPolyline( points, matrix ) ),
 				shapeId: chosen,
 				label: label( chosen ),
@@ -465,6 +470,7 @@ export class FormScene {
 		this.createForm( {
 			geometry: result.geometry,
 			construction: result.construction,
+			frame: result.frame,
 			shapeId: 'ribbon',
 			label: 'Ribbon',
 			radius: result.geometry.boundingSphere.radius,
@@ -533,6 +539,7 @@ export class FormScene {
 		const previous = form.geometry;
 		form.geometry = previous.clone().applyMatrix4( matrix );
 		form.mesh.geometry = form.geometry;
+		form.objectBounds.matrix.premultiply( matrix );
 		previous.dispose();
 		form.box.setFromBufferAttribute( form.geometry.getAttribute( 'position' ) );
 		form.brush = form.openSurface ? null : makeBrush( form.geometry );
