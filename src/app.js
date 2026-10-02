@@ -139,6 +139,7 @@ export class FormScene {
 		this.intersections = [];
 		this.nextId = 1;
 		this.selected = null;
+		this.selection = new Set();
 		this.onChange = () => {};
 
 		this.showConstruction = false;
@@ -582,9 +583,16 @@ export class FormScene {
 
 	}
 
-	select( form ) {
+	select( form, additive = false ) {
 
-		this.selected = this.forms.includes( form ) ? form : null;
+		if ( ! additive ) this.selection.clear();
+		if ( this.forms.includes( form ) ) {
+
+			if ( additive && this.selection.has( form ) ) this.selection.delete( form );
+			else this.selection.add( form );
+
+		}
+		this.selected = [ ...this.selection ].at( -1 ) ?? null;
 		this.onChange();
 
 	}
@@ -612,7 +620,8 @@ export class FormScene {
 		const index = this.forms.indexOf( form );
 		if ( index < 0 ) return false;
 		this.forms.splice( index, 1 );
-		if ( this.selected === form ) this.selected = null;
+		this.selection.delete( form );
+		this.selected = [ ...this.selection ].at( -1 ) ?? null;
 		if ( this.carveForm === form ) {
 
 			this.carveForm = null;

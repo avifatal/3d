@@ -40,7 +40,7 @@ select { width: 100%; min-width: 0; flex: 1; }
 .quick-tools { position: fixed; right: max(18px, env(safe-area-inset-right)); top: max(16px, env(safe-area-inset-top)); display: flex; gap: 4px; padding: 5px; border: 1px solid var(--panel-edge); border-radius: 10px; background: var(--panel); box-shadow: 0 3px 16px #0000000b; }
 .quick-tools button { border: 0; background: transparent; min-height: 38px; font-size: 12px; }
 .quick-tools #newScene { border-left: 1px solid var(--panel-edge); border-radius: 0 6px 6px 0; }
-.camera-lock[aria-pressed="true"] { color: var(--accent); background: var(--hover); }
+.camera-lock[aria-pressed="true"], #togglePerspective[aria-pressed="true"] { color: var(--accent); background: var(--hover); }
 .tool-tabs { grid-column: 1; grid-row: 2 / 4; display: flex; flex-direction: column; gap: 8px; padding: 16px 6px; border-right: 1px solid var(--panel-edge); background: color-mix(in srgb, var(--panel) 60%, var(--hover)); }
 .tool-tabs button { flex-direction: column; gap: 5px; padding: 10px 2px; min-height: 58px; font-size: 10px; color: var(--muted); border: 1px solid transparent; background: transparent; }
 .tool-tabs button[aria-pressed="true"] { color: var(--accent); background: var(--field); border-color: var(--panel-edge); box-shadow: 0 2px 3px #00000005; }

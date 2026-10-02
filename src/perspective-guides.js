@@ -37,26 +37,28 @@ export class PerspectiveGuides {
   this.viewer = viewer;
   this.scene = scene;
   this.enabled = true;
-  this.arrows = Array.from( { length: 12 }, () => {
-   const arrow = new ArrowHelper( new Vector3( 1, 0, 0 ), new Vector3(), 1, 0xe76a48 );
-   arrow.name = 'perspectiveGuide';
-   for ( const part of [ arrow.line, arrow.cone ] ) {
-    part.material.depthTest = false;
-    part.material.depthWrite = false;
-    part.material.transparent = true;
-    part.material.opacity = 0.72;
-    part.renderOrder = 4;
-   }
-   arrow.visible = false;
-   viewer.scene.add( arrow );
-   return arrow;
-  } );
+  this.arrows = [];
+ }
+ createArrow() {
+  const { viewer } = this;
+  const arrow = new ArrowHelper( new Vector3( 1, 0, 0 ), new Vector3(), 1, 0xe76a48 );
+  arrow.name = 'perspectiveGuide';
+  for ( const part of [ arrow.line, arrow.cone ] ) {
+   part.material.depthTest = false;
+   part.material.depthWrite = false;
+   part.material.transparent = true;
+   part.material.opacity = 0.72;
+   part.renderOrder = 4;
+  }
+  arrow.visible = false;
+  viewer.scene.add( arrow );
+  return arrow;
  }
  update() {
   const { viewer, scene } = this;
-  const form = scene.selected;
-  const rays = this.enabled && form && !form.faint
-   ? perspectiveRays( form.objectBounds, viewer.camera, form.previewMatrix ) : [];
+  const rays = this.enabled ? [ ...scene.selection ].filter( form => !form.faint )
+   .flatMap( form => perspectiveRays( form.objectBounds, viewer.camera, form.previewMatrix ) ) : [];
+  while ( this.arrows.length < rays.length ) this.arrows.push( this.createArrow() );
   const forward = viewer.camera.getWorldDirection( new Vector3() );
   const unitsPerPixel = 2 * Math.tan( viewer.camera.fov * Math.PI / 360 ) / Math.max( viewer.container.clientHeight, 1 );
   for ( let i = 0; i < this.arrows.length; i ++ ) {

@@ -1,4 +1,4 @@
-import { Matrix4, Object3D } from 'three';
+import { Box3, Matrix4, Object3D } from 'three';
 import { objectCenter } from './object-bounds.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
@@ -10,6 +10,7 @@ export class ObjectEditor {
   this.onCommit = onCommit;
   this.mode = 'select';
   this.form = null;
+  this.forms = [];
   this.gesture = false;
   this.history = [];
   this.proxy = new Object3D();
@@ -46,31 +47,40 @@ export class ObjectEditor {
   this.sync();
  }
  sync() {
-  this.history = this.history.filter( entry => this.scene.forms.includes( entry.form ) );
+  this.history = this.history.filter( entry => entry.forms.every( form => this.scene.forms.includes( form ) ) );
   const form = this.scene.selected;
-  if ( this.start && ( form !== this.form || form?.faint ) ) this.cancel();
+  const forms = [ ...this.scene.selection ];
+  if ( this.start && ( forms.length !== this.forms.length || forms.some( ( f, i ) => f !== this.forms[ i ] || f.faint ) ) ) this.cancel();
   this.form = form;
+  this.forms = forms;
+  const editable = forms.length > 0 && forms.every( f => !f.faint );
   if ( this.start ) return;
-  if ( !form || form.faint || this.mode === 'select' ) this.controls.detach();
+  if ( !editable || this.mode === 'select' ) this.controls.detach();
   else {
-   objectCenter( form, this.proxy.position );
+   this.center( this.proxy.position );
    this.proxy.quaternion.identity();
    this.proxy.updateMatrixWorld( true );
    this.controls.attach( this.proxy );
   }
   for ( const button of document.querySelectorAll( '[data-transform]' ) ) {
    button.classList.toggle( 'active', button.dataset.transform === this.mode );
-   button.disabled = button.dataset.transform !== 'select' && ( !form || form.faint );
+   button.disabled = button.dataset.transform !== 'select' && ( !editable );
   }
   document.getElementById( 'undoTransform' ).disabled = !this.history.length;
  }
+ center( target = this.proxy.position.clone() ) {
+  if ( this.forms.length === 1 ) return objectCenter( this.forms[ 0 ], target );
+  const bounds = new Box3();
+  for ( const form of this.forms ) bounds.union( form.box );
+  return bounds.getCenter( target );
+ }
  begin() {
-  if ( !this.form ) return;
+  if ( !this.forms.length || this.forms.some( form => form.faint ) ) return;
   // Drain orbit inertia without changing the user's camera-lock setting.
   const rotate = this.viewer.controls.enableRotate;
   this.viewer.setCameraLocked( true );
   this.viewer.controls.enableRotate = rotate;
-  this.start = new Matrix4().makeTranslation( ...objectCenter( this.form ).toArray() );
+  this.start = new Matrix4().makeTranslation( ...this.center().toArray() );
  }
  delta() {
   this.proxy.updateMatrix();
@@ -79,21 +89,21 @@ export class ObjectEditor {
  preview() {
   if ( !this.start ) return;
   const delta = this.delta();
-  this.scene.previewTransform( this.form, delta );
+  for ( const form of this.forms ) this.scene.previewTransform( form, delta );
   this.onPreview( this.form );
  }
  finish() {
   if ( !this.start ) return;
   const delta = this.delta();
-  const form = this.form;
+  const forms = [ ...this.forms ];
   this.start = null;
   this.viewer.controls.enabled = this.orbitEnabled ?? true;
   if ( delta.elements.some( ( v, i ) => Math.abs( v - ( i % 5 === 0 ? 1 : 0 ) ) > 1e-7 ) ) {
-   this.history.push( { form, inverse: delta.clone().invert() } );
+   this.history.push( { forms, inverse: delta.clone().invert() } );
    if ( this.history.length > 30 ) this.history.shift();
-   this.scene.transformForm( form, delta );
+   for ( const form of forms ) this.scene.transformForm( form, delta );
    this.onCommit();
-  } else this.scene.previewTransform( form );
+  } else for ( const form of forms ) this.scene.previewTransform( form );
   this.sync();
  }
  cancel() {
@@ -101,7 +111,7 @@ export class ObjectEditor {
   this.start = null;
   this.controls.dragging = false;
   this.controls.axis = null;
-  this.scene.previewTransform( this.form );
+  for ( const form of this.forms ) this.scene.previewTransform( form );
   this.onPreview( this.form );
   this.viewer.controls.enabled = this.orbitEnabled ?? true;
   this.sync();
@@ -110,8 +120,8 @@ export class ObjectEditor {
  undo() {
   if ( this.start ) return;
   const entry = this.history.pop();
-  if ( entry && this.scene.forms.includes( entry.form ) ) {
-   this.scene.transformForm( entry.form, entry.inverse );
+  if ( entry && entry.forms.every( form => this.scene.forms.includes( form ) ) ) {
+   for ( const form of entry.forms ) this.scene.transformForm( form, entry.inverse );
    this.onCommit();
   }
   this.sync();

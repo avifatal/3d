@@ -466,25 +466,41 @@ $( 'reribbon' ).addEventListener( 'click', () => withBusyState( () => { ribbon()
 
 // --- object selection ------------------------------------------------------
 
-const selectionBox = new Box3Helper( new Box3(), 0xc23b17 );
-selectionBox.material.depthTest = false;
-selectionBox.material.transparent = true;
-selectionBox.material.opacity = 0.55;
-selectionBox.material.depthWrite = false;
-selectionBox.renderOrder = 3;
-selectionBox.visible = false;
-const selectionFrame = new Group();
-selectionFrame.name = 'selectionBounds';
-selectionFrame.matrixAutoUpdate = false;
-selectionFrame.add( selectionBox );
-viewer.scene.add( selectionFrame );
+const selectionFrames = new Map();
 
-function updateSelectionBox( form ) {
+function updateSelectionBox() {
 
-	selectionBox.box.copy( form.objectBounds.box );
-	selectionFrame.matrix.copy( form.objectBounds.matrix );
-	if ( form.previewMatrix ) selectionFrame.matrix.premultiply( form.previewMatrix );
-	selectionFrame.matrixWorldNeedsUpdate = true;
+	for ( const [ form, frame ] of selectionFrames ) {
+
+		if ( scene.selection.has( form ) ) continue;
+		frame.removeFromParent();
+		frame.children[ 0 ].dispose();
+		selectionFrames.delete( form );
+
+	}
+	for ( const form of scene.selection ) {
+
+		let frame = selectionFrames.get( form );
+		if ( !frame ) {
+
+			const box = new Box3Helper( new Box3(), 0xc23b17 );
+			Object.assign( box.material, { depthTest: false, transparent: true, opacity: 0.55, depthWrite: false } );
+			box.renderOrder = 3;
+			frame = new Group();
+			frame.matrixAutoUpdate = false;
+			frame.add( box );
+			viewer.scene.add( frame );
+			selectionFrames.set( form, frame );
+
+		}
+		frame.name = form === scene.selected ? 'selectionBounds' : 'selectionBoundsSecondary';
+		frame.visible = !form.faint;
+		frame.children[ 0 ].box.copy( form.objectBounds.box );
+		frame.matrix.copy( form.objectBounds.matrix );
+		if ( form.previewMatrix ) frame.matrix.premultiply( form.previewMatrix );
+		frame.matrixWorldNeedsUpdate = true;
+
+	}
 
 }
 
@@ -502,25 +518,32 @@ scene.onChange = () => {
 
 	$( 'deleteSelected' ).disabled = ! scene.selected;
 	$( 'hideSelected' ).disabled = ! scene.selected;
-	labelButton( $( 'hideSelected' ), scene.selected?.faint ? 'Show object (H)' : 'Hide object (H)', scene.selected?.faint ? 'eye' : 'eyeOff' );
-	$( 'hideSelected' ).setAttribute( 'aria-pressed', String( !! scene.selected?.faint ) );
-	selectionBox.visible = !! scene.selected && ! scene.selected.faint;
-	if ( scene.selected ) updateSelectionBox( scene.selected );
+	const allHidden = scene.selection.size > 0 && [ ...scene.selection ].every( form => form.faint );
+	const noun = scene.selection.size > 1 ? 'objects' : 'object';
+	labelButton( $( 'hideSelected' ), `${allHidden ? 'Show' : 'Hide'} ${noun} (H)`, allHidden ? 'eye' : 'eyeOff' );
+	$( 'hideSelected' ).setAttribute( 'aria-pressed', String( allHidden ) );
+	updateSelectionBox();
 	editor.sync();
 
 };
 
 function deleteSelected() {
 
-	if ( scene.removeForm( scene.selected ) ) report( 'object deleted' );
+	editor.cancel();
+	const forms = [ ...scene.selection ];
+	for ( const form of forms ) scene.removeForm( form );
+	if ( forms.length ) report( `${count( forms.length, 'object' )} deleted` );
 
 }
 
 function toggleSelected() {
 
 	if ( ! scene.selected ) return;
-	scene.setFaint( scene.selected, ! scene.selected.faint );
-	report( scene.selected.faint ? 'object hidden' : 'object restored' );
+	editor.cancel();
+	const forms = [ ...scene.selection ];
+	const faint = !forms.every( form => form.faint );
+	for ( const form of forms ) scene.setFaint( form, faint );
+	report( `${count( forms.length, 'object' )} ${faint ? 'hidden' : 'restored'}` );
 
 }
 
@@ -563,7 +586,7 @@ canvas.addEventListener( 'pointerup', event => {
 	// Prefer visible forms so a hidden one never blocks selection behind it.
 	const hits = raycaster.intersectObjects( scene.forms.map( form => form.mesh ), false );
 	const forms = hits.map( hit => scene.forms.find( form => form.mesh === hit.object ) );
-	scene.select( forms.find( form => ! form.faint ) ?? forms[ 0 ] );
+	scene.select( forms.find( form => ! form.faint ) ?? forms[ 0 ], event.ctrlKey || event.metaKey );
 
 } );
 
@@ -682,6 +705,7 @@ bindCheck( 'showPerspective', value => {
 
 	perspectiveGuides.enabled = value;
 	$( 'togglePerspective' ).setAttribute( 'aria-pressed', String( value ) );
+	labelButton( $( 'togglePerspective' ), `${value ? 'Hide' : 'Show'} extended perspective lines for selected objects`, 'perspective', 'Perspective lines' );
 	perspectiveGuides.update();
 
 } );
